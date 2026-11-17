@@ -1,5 +1,7 @@
 # mgu-apps
 
+[简体中文](README.zh-CN.md)
+
 Apps for the BMW iDrive 7 (MGU) head unit by [giuseppesalatino-boop](https://github.com/giuseppesalatino-boop), in one repository: **one MGU Store source lists them all**, and each app installs and updates on its own.
 
 | App | Folder | What it does |

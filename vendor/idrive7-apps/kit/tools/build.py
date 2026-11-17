@@ -368,9 +368,13 @@ def build_start_widget(spec, app_id, icon_src, out):
     return {'component': comp, 'layout': ui['containers']['500']['components'][str(WIDGET_COMPONENT_ID)]['cells']['Widget']['value']}
 
 
-def build(app_id, language='en'):
+def build(app_id, language='en', without_sdk=False):
     spec = json.load(open(os.path.join(APPS, app_id, 'app.json'), encoding='utf-8'))
+    original_version = spec['version']
     spec = localize_spec(spec, language)
+    if without_sdk:
+        # MGU Deploy's third-party package path accepts x.y.z and supplies the donor SDK.
+        spec['version'] = original_version
     spec.setdefault('id', app_id)
     ver = spec['version']
     stage = os.path.join(DIST, app_id)
@@ -378,7 +382,6 @@ def build(app_id, language='en'):
     src = os.path.join(stage, 'source')
     os.makedirs(os.path.join(src, 'javascript', 'kit'))
     os.makedirs(os.path.join(src, 'config'))
-    os.makedirs(os.path.join(src, 'node_modules', 'oap-sdk'))
 
     manifest = manifest_for(json.loads(json.dumps(spec)))
     xml, uidesc, strings, state_ids = build_ui(spec, language)
@@ -469,8 +472,10 @@ def build(app_id, language='en'):
     if credit(language):
         locale['credit'] = credit(language)['corner']
     json.dump(locale, open(os.path.join(src, 'javascript', 'kit', 'locale.json'), 'w', encoding='utf-8', newline='\n'), ensure_ascii=False)
-    shutil.copy(os.path.join(SDK, 'index.js'), os.path.join(src, 'node_modules', 'oap-sdk', 'index.js'))
-    shutil.copy(os.path.join(SDK, 'package.json'), os.path.join(src, 'node_modules', 'oap-sdk', 'package.json'))
+    if not without_sdk:
+        os.makedirs(os.path.join(src, 'node_modules', 'oap-sdk'))
+        shutil.copy(os.path.join(SDK, 'index.js'), os.path.join(src, 'node_modules', 'oap-sdk', 'index.js'))
+        shutil.copy(os.path.join(SDK, 'package.json'), os.path.join(src, 'node_modules', 'oap-sdk', 'package.json'))
 
     # --- rhmiData: package format (inside source/) and installed format ---
     icon = spec['id'] + '_icon.png'
@@ -552,11 +557,12 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--language', choices=languages(), default='en')
+    parser.add_argument('--without-sdk', action='store_true')
     parser.add_argument('apps', nargs='*')
     args = parser.parse_args()
     ids = args.apps or sorted(d for d in os.listdir(APPS) if os.path.exists(os.path.join(APPS, d, 'app.json')))
     for i in ids:
-        build(i, args.language)
+        build(i, args.language, args.without_sdk)
 
 
 if __name__ == '__main__':
