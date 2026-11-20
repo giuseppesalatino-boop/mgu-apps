@@ -484,6 +484,53 @@
             40
           ]
         }
+      },
+      "labels": {
+        "_about": "The gauge's labels in BMW's digits, narrower than the scale's (sx 0.7 of their width), left edge and centre height measured on the photo; the pump icon is drawn as shapes (tools/gen_static.py draw_pump) in its 35 x 28 px box.",
+        "sx": 0.7,
+        "gap": 2.6,
+        "color": [
+          237,
+          238,
+          246
+        ],
+        "items": [
+          {
+            "text": "1",
+            "at": [
+              0.19323,
+              0.60903
+            ],
+            "h": 20
+          },
+          {
+            "text": "1/2",
+            "at": [
+              0.21719,
+              0.71875
+            ],
+            "h": 22
+          },
+          {
+            "text": "0",
+            "at": [
+              0.24323,
+              0.82847
+            ],
+            "h": 22
+          }
+        ],
+        "icon": {
+          "kind": "pump",
+          "at": [
+            0.23281,
+            0.75417
+          ],
+          "size": [
+            35,
+            28
+          ]
+        }
       }
     },
     "oil": {

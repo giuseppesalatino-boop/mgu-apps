@@ -203,14 +203,17 @@ DIGITS = {
     '8': [_T, _M, _B, (0, 0, _L, 22), (_R, 0, 29, 22)],
     '9': [_T, (0, 0, _L, 13.5), _M, (_R, 0, 29, 22), _B],
 }
-DIGIT_W = {'1': 18}
+DIGITS['/'] = [('quad', (12, 0), (17, 0), (5, 22), (0, 22))]
+DIGIT_W = {'1': 18, '/': 17}
 
 
-def draw_number(img, text, x_edge, y_mid, h, advance, color, ss=8, align='right'):
-    """Text of BMW's digits into img (RGBA, grid px), its right (or left) edge at x_edge, centred on y_mid, h px tall."""
+def draw_number(img, text, x_edge, y_mid, h, advance, color, ss=8, align='right', sx=1.0, gap=None):
+    """Text of BMW's digits into img (RGBA, grid px), its right (or left) edge at x_edge, centred on y_mid, h px tall;
+    sx narrows the glyphs, gap (px) overrides the spacing that advance gives."""
     k = h / 22.0
-    widths = [DIGIT_W.get(ch, 29) * k for ch in text]
-    total = sum(widths) + (advance - 29) * k * (len(text) - 1)
+    widths = [DIGIT_W.get(ch, 29) * k * sx for ch in text]
+    space = gap if gap is not None else (advance - 29) * k
+    total = sum(widths) + space * (len(text) - 1)
     x0, y0 = (x_edge - total if align == 'right' else x_edge), y_mid - h / 2
     W, H = int(total) + 4, int(h) + 4
     m = Image.new('L', (W * ss, H * ss), 0)
@@ -219,12 +222,17 @@ def draw_number(img, text, x_edge, y_mid, h, advance, color, ss=8, align='right'
     for ch, w in zip(text, widths):
         for part in DIGITS[ch]:
             if part[0] == 'quad':
-                d.polygon([((x + px_ * k) * ss, (2 + py * k) * ss) for px_, py in part[1:]], fill=255)
+                d.polygon([((x + px_ * k * sx) * ss, (2 + py * k) * ss) for px_, py in part[1:]], fill=255)
             else:
                 a, b, c, e = part
-                d.rounded_rectangle([(x + a * k) * ss, (2 + b * k) * ss, (x + c * k) * ss - 1, (2 + e * k) * ss - 1],
+                if c - a <= 8 and sx != 1.0:          # an upright keeps its thickness when the digit is narrowed
+                    a2 = a * sx if a < 14.5 else c * sx - (c - a)
+                    c2 = a2 + (c - a)
+                else:
+                    a2, c2 = a * sx, c * sx
+                d.rounded_rectangle([(x + a2 * k) * ss, (2 + b * k) * ss, (x + c2 * k) * ss - 1, (2 + e * k) * ss - 1],
                                     radius=1.6 * k * ss, fill=255)
-        x += w + (advance - 29) * k
+        x += w + space
     m = m.resize((W, H), Image.LANCZOS)
     layer = Image.new('RGBA', (W, H), tuple(color) + (0,))
     layer.putalpha(m)
@@ -299,6 +307,40 @@ def draw_gauges(d, cfg, sc):
             d.polygon(sc([lerp(bl, tl, b), lerp(br, tr_, b), lerp(br, tr_, a), lerp(bl, tl, a)]), fill=tuple(col['track']))
 
 
+def draw_pump(img, x, y, w, h, color, ss=8):
+    """BMW's fuel pump icon with its arrow (the filler side), drawn in a w x h px box at x, y; traced on the photo's
+    35 x 28 px icon."""
+    k = (w / 35.0, h / 28.0)
+    m = Image.new('L', (int(w + 4) * ss, int(h + 4) * ss), 0)
+    d = ImageDraw.Draw(m)
+    P = lambda px_, py: ((2 + px_ * k[0]) * ss, (2 + py * k[1]) * ss)
+    lw = int(round(2.6 * ss))
+    d.rounded_rectangle([P(1, 1), P(16, 12)], radius=2 * ss, outline=255, width=int(round(3 * ss)))   # the window
+    d.polygon([P(-1.5, 27), P(0.5, 22), P(17, 22), P(18, 27)], fill=255)                     # the foot, flared
+    d.rounded_rectangle([P(0, 10), P(16.5, 27)], radius=1.5 * ss, fill=255)                # the body
+    d.line([P(15, 3.5), P(19, 6.5), P(21, 9.5), P(21, 20), P(19.5, 23.5), P(16, 24.5)], fill=255, width=lw,
+           joint='curve')                                                                   # the hose, apart from the body
+    d.polygon([P(26, 7), P(34.5, 11.5), P(26, 17)], fill=255)                               # the arrow
+    m = m.resize((int(w + 4), int(h + 4)), Image.LANCZOS)
+    layer = Image.new('RGBA', m.size, tuple(color) + (0,))
+    layer.putalpha(m)
+    img.alpha_composite(layer, (int(round(x)) - 2, int(round(y)) - 2))
+
+
+def draw_gauge_labels(img, cfg):
+    W, H = cfg['grid']
+    for el in cfg['elements'].values():
+        lb = el.get('labels') if 'track' in el else None
+        if not lb or el.get('_side') == 'right':
+            continue
+        for it in lb['items']:
+            draw_number(img, it['text'], it['at'][0] * W, it['at'][1] * H, it['h'], 32.5, lb['color'],
+                        align='left', sx=lb.get('sx', 1.0), gap=lb.get('gap'))
+        ic = lb.get('icon')
+        if ic and ic['kind'] == 'pump':
+            draw_pump(img, ic['at'][0] * W, ic['at'][1] * H, ic['size'][0], ic['size'][1], lb['color'])
+
+
 def build_static(cfg):
     """The static layer, RGBA at grid size: each bracket filled zone by zone (band, gap, stripe), then its lines and marks."""
     expand(cfg)
@@ -327,6 +369,7 @@ def build_static(cfg):
             img = bevel(img, cfg, el)
     draw_numbers(img, cfg)
     draw_labels(img, cfg)
+    draw_gauge_labels(img, cfg)
     return img
 
 
