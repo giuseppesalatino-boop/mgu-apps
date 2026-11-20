@@ -61,8 +61,9 @@ def outlines(cfg):
     """Every element's outline as a dense px polyline (the reference for --compare)."""
     out = {}
     for name, el in cfg['elements'].items():
-        if 'outline' in el:
-            out[name] = fillet_polyline(to_px(cfg, el['outline']))
+        for key in ('outline', 'inner'):
+            if key in el:
+                out[name + '.' + key] = fillet_polyline(to_px(cfg, el[key]))
     return out
 
 
