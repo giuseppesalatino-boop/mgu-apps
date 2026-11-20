@@ -242,8 +242,10 @@ def draw_labels(img, cfg, ss=8):
         l, t, r, b = font.getbbox(lb['text'], stroke_width=sw)  # the photo's text sets the scale
         k = (y1 - y0) / (b - t)
         l2, t2, r2, b2 = font.getbbox(text, stroke_width=sw)
-        m = Image.new('L', (r2 - l2 + 8, b - t + 8), 0)
+        m = Image.new('L', (r2 - l2 + 8, max(b, b2) - t + 8), 0)      # room for descenders (the p of mph)
         ImageDraw.Draw(m).text((4 - l2, 4 - t), text, font=font, fill=255, stroke_width=sw, stroke_fill=255)
+        if text != lb['text']:
+            y0 -= lb.get('lift_mph', 0)                              # raised so the descender clears the line below
         m = m.resize((max(1, round(m.width * k)), max(1, round(m.height * k))), Image.LANCZOS)
         kx = 1.0
         layer = Image.new('RGBA', m.size, tuple(lb['color']) + (0,))

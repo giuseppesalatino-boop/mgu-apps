@@ -255,7 +255,8 @@
           219
         ],
         "scale_of": "bracket_left",
-        "bold": 0.012
+        "bold": 0.012,
+        "lift_mph": 4
       }
     }
   }
