@@ -953,6 +953,34 @@ def draw_shift_lights(img, cfg, lit=0, flash=False):
     return img
 
 
+def light_numbers(img, cfg, el, y_v):
+    """The scale's numbers near the value drawn again in white over their dim colour, by how near they are (in marks)."""
+    n = el['numbers']
+    lt = n.get('lit')
+    if not lt:
+        return img
+    W, H = cfg['grid']
+    sc = el['ticks']['scales'][n['scale']]
+    vals, ys = (sc['values'], sc['y']) if isinstance(sc, dict) else (sc, el['ticks']['y'])
+    yy = sorted(y * H for y in ys)
+    step = (yy[-1] - yy[0]) / max(len(yy) - 1, 1)
+    out = fillet_polyline(to_px(cfg, el['outline']))
+    left = n.get('align') == 'left'
+    for v, yn in zip(vals, ys):
+        y = yn * H
+        d = abs(y - y_v) / step
+        w = float(np.clip(1 - (d - lt['full']) / (lt['fade'] - lt['full']), 0, 1))
+        if w <= 0:
+            continue
+        layer = Image.new('RGBA', img.size, (0, 0, 0, 0))
+        draw_number(layer, str(v), x_on(out, y) + (n['gap'] if left else -n['gap']), y, n['h'], n['advance'],
+                    lt['color'], align='left' if left else 'right')
+        a = np.asarray(layer).copy()
+        a[..., 3] = (a[..., 3].astype(np.float32) * w).astype(np.uint8)
+        img.alpha_composite(Image.fromarray(a, 'RGBA'))
+    return img
+
+
 def draw_dynamic(img, cfg, tel):
     """The live layer over the static one (both at the reference's size): speed and revs fills with their bars, the
     rev zones for the oil temperature, the fuel and temperature levels, the big speed and gear."""
@@ -977,10 +1005,19 @@ def draw_dynamic(img, cfg, tel):
     # the shift lights: from 'from_rpm' below the shift point (the redline less 'before') up to it
     sl = E.get('shift_lights')
     if sl:
-        shift = rz['red'] - sl.get('before', 300)
-        start = shift - sl['span'][eng]
-        lit = int(np.clip((tel['rpm'] - start) / (shift - start), 0, 1) * sl['n'] + 1e-6)
-        img = draw_shift_lights(img, cfg, lit, tel['rpm'] >= shift)
+        sr = sl['rpm'][eng]
+        n_y = sum(1 for c in sl['colors'] if c[0] > 250 and c[1] > 150)      # the yellow ones
+        r = tel['rpm']
+        if r < sr['first_red']:
+            lit = int(np.clip((r - sr['start']) / (sr['first_red'] - sr['start']), 0, 1) * n_y + 1e-6)
+        else:
+            lit = n_y + 1 + int(np.clip((r - sr['first_red']) / (sr['last_red'] - sr['first_red']), 0, 1) * (sl['n'] - n_y - 1) + 1e-6)
+        past = r > sr['last_red']
+        flash_on = tel.get('frame', 0) % 2 == 0                # past the last red: on / off every frame
+        img = draw_shift_lights(img, cfg, 0 if past and not flash_on else lit, past and flash_on)
+    # the numbers near the value light white
+    img = light_numbers(img, cfg, L, value_y(L, L['numbers']['scale'], tel['speed']))
+    img = light_numbers(img, cfg, R, value_y(R, rz['scale'], tel['rpm'] / 1000))
     # the fills
     img = draw_bracket_value(img, cfg, L, value_y(L, L['numbers']['scale'], tel['speed']), 'blue')
     img = draw_bracket_value(img, cfg, R, value_y(R, rz['scale'], tel['rpm'] / 1000), 'red')
