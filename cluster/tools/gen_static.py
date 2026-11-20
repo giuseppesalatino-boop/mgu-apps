@@ -397,6 +397,23 @@ def draw_panel(img, cfg):
             arr = np.repeat(grad[:, None, :], img.size[0], axis=1).astype(np.uint8)
             fill = Image.fromarray(np.dstack([arr, np.full(arr.shape[:2], 255, np.uint8)]), 'RGBA')
         img.paste(fill, (0, 0), m)
+    # the thin light lines, added over the blue, only inside the panel and its wings
+    for el in cfg['elements'].values():
+        ln = el.get('lines')
+        if not ln:
+            continue
+        clip = Image.new('L', img.size, 0)
+        dc = ImageDraw.Draw(clip)
+        for poly in panel_shapes(cfg).values():
+            dc.polygon([(x * SS, y * SS) for x, y in poly], fill=255)
+        lm = Image.new('L', img.size, 0)
+        dl = ImageDraw.Draw(lm)
+        for x0, y0, x1, y1 in ln['segments']:
+            dl.line([(x0 * W * SS, y0 * H * SS), (x1 * W * SS, y1 * H * SS)], fill=255, width=int(round(ln['width'] * SS)))
+        m = np.minimum(np.asarray(lm), np.asarray(clip)).astype(np.float32) / 255.0
+        arr = np.asarray(img).astype(np.float32)
+        arr[..., :3] = np.clip(arr[..., :3] + m[..., None] * np.array(ln['add'], np.float32), 0, 255)
+        img.paste(Image.fromarray(arr.astype(np.uint8), 'RGBA'), (0, 0))
 
 
 def draw_bar(img, cfg):
