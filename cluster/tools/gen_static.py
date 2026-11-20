@@ -374,6 +374,27 @@ def draw_labels(img, cfg, ss=8):
         img.alpha_composite(layer, (int(round(x0 - 4 * k * kx)), int(round(y0 - 4 * k))))
 
 
+def draw_panel(img, cfg):
+    """The central frame (supersampled canvas): its shape filled with the row gradient, the wings flat."""
+    W, H = cfg['grid']
+    for name, poly in panel_shapes(cfg).items():
+        base = name.split('.')[0]
+        col = cfg['elements'][base].get('colors')
+        if not col:
+            continue
+        m = Image.new('L', img.size, 0)
+        ImageDraw.Draw(m).polygon([(x * SS, y * SS) for x, y in poly], fill=255)
+        if name.endswith(('.wing_l', '.wing_r')):
+            fill = Image.new('RGBA', img.size, tuple(col['wing']) + (255,))
+        else:
+            ys, cs = [r[0] for r in col['rows']], np.array([r[1] for r in col['rows']], np.float32)
+            yy = (np.arange(img.size[1]) + 0.5) / SS
+            grad = np.stack([np.interp(yy, ys, cs[:, k]) for k in range(3)], -1)
+            arr = np.repeat(grad[:, None, :], img.size[0], axis=1).astype(np.uint8)
+            fill = Image.fromarray(np.dstack([arr, np.full(arr.shape[:2], 255, np.uint8)]), 'RGBA')
+        img.paste(fill, (0, 0), m)
+
+
 def draw_gauges(d, cfg, sc):
     """The small slanted gauges (fuel, oil): rail and empty track, the track cut by its gaps (polygons in grid px)."""
     W, H = cfg['grid']
@@ -549,6 +570,8 @@ def build_static(cfg):
         d.line(sc(fillet_polyline(to_px(cfg, el['inner']))[1:]), fill=tuple(col['inner_line']), width=2 * SS, joint='curve')
         for x0, y0, x1, y1 in tick_rects(cfg, el):
             d.rectangle([x0 * SS, y0 * SS, x1 * SS, y1 * SS], fill=tuple(col['tick']))
+    draw_panel(img, cfg)
+    d = ImageDraw.Draw(img)
     draw_gauges(d, cfg, sc)
     img = img.resize((W, H), Image.LANCZOS)
     for el in cfg['elements'].values():

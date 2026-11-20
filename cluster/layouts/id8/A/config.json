@@ -870,7 +870,97 @@
           3
         ]
       ],
-      "_about_gear": "The one part that is not symmetric: the gear cut-out's inner side slants the same way as the speed cut-out's (x = -0.615 y + 1538, from (1355, 298) down to (1299, 388)), not as its mirror. 'gear_cut' replaces the two mirrored vertices."
+      "_about_gear": "The one part that is not symmetric: the gear cut-out's inner side slants the same way as the speed cut-out's (x = -0.615 y + 1538, from (1355, 298) down to (1299, 388)), not as its mirror. 'gear_cut' replaces the two mirrored vertices.",
+      "colors": {
+        "_about": "The panel's fill by height: [y px, RGB] stops sampled on the photo's sides (x 560-760 and 1160-1360, row medians), linear between them; a lighter top band, darker middle, lighter lower part. The wings are flat.",
+        "rows": [
+          [
+            160,
+            [
+              20,
+              80,
+              200
+            ]
+          ],
+          [
+            238,
+            [
+              1,
+              83,
+              222
+            ]
+          ],
+          [
+            248,
+            [
+              0,
+              56,
+              145
+            ]
+          ],
+          [
+            300,
+            [
+              2,
+              40,
+              104
+            ]
+          ],
+          [
+            360,
+            [
+              3,
+              33,
+              87
+            ]
+          ],
+          [
+            420,
+            [
+              4,
+              39,
+              96
+            ]
+          ],
+          [
+            470,
+            [
+              6,
+              54,
+              130
+            ]
+          ],
+          [
+            480,
+            [
+              24,
+              76,
+              152
+            ]
+          ],
+          [
+            540,
+            [
+              19,
+              64,
+              132
+            ]
+          ],
+          [
+            584,
+            [
+              22,
+              60,
+              115
+            ]
+          ]
+        ],
+        "wing": [
+          3,
+          58,
+          142
+        ]
+      }
     },
     "speed": {
       "_about": "The speed in the speed cut-out: BMW's big squared digits (tools/gen_static.py big_glyph: 76 x 59 px, bars 10, uprights 22, measured on the photo's 57), right edge at x 540, top at y 315, 10 px apart; always full size: three digits grow to the left over the cut-out's slanted side. Dynamic: drawn by the live layer, sampled here with the photo's value.",
