@@ -6,7 +6,7 @@
   ],
   "elements": {
     "bracket_left": {
-      "_about": "The blue speed bracket's outer profile, from the end of its top line round the apex to the tip of its foot. Legs fitted on the photo's pixels (max error 1.1 px): upper x = -0.5911 y + 346.31, lower x = 0.5755 y - 25.78; the right bracket is its mirror about x 0.5 (checked later on the red one).",
+      "_about": "The blue speed bracket's outer profile, from the end of its top line round the apex, then straight along y 635 past the 0 to where the light band ends at x 510 (the darker band and glow below are the shadow, drawn later). Legs fitted on the photo's pixels (max error 1.1 px): upper x = -0.5911 y + 346.31, lower x = 0.5755 y - 25.78; the right bracket is its mirror about x 0.5 (checked later on the red one).",
       "outline": [
         [
           0.34115,
@@ -24,18 +24,13 @@
           33
         ],
         [
-          0.18411,
-          0.91528,
-          10
+          0.17693,
+          0.88194,
+          8
         ],
         [
-          0.23698,
-          0.91528,
-          40
-        ],
-        [
-          0.30729,
-          0.89306,
+          0.26562,
+          0.88194,
           0
         ]
       ]
