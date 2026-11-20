@@ -791,7 +791,7 @@ def draw_bracket_value(img, cfg, el, y_v, colour):
     t = np.clip((Y - y_v) / max(640 - y_v, 1), 0, 1)[..., None]
     grad = lambda pair: np.array(pair[0], np.float32) + (np.array(pair[1], np.float32) - np.array(pair[0], np.float32)) * t
     col_band, col_stripe = grad(F['band']), grad(F['stripe'])
-    below = np.clip(Y - (y_v + 7), 0, 1)
+    below = np.clip(Y - (y_v + 6), 0, 1)
     bar = (np.abs(Y - (y_v + 0.5)) < 3.0).astype(np.float32) + 0.5 * (np.abs(np.abs(Y - (y_v + 0.5)) - 3.25) < 0.5)
     glow = np.clip(1 - (y_v - Y) / F['glow_px'], 0, 1) ** 1.4 * (Y < y_v - 3)
     arr = np.asarray(img).astype(np.float32)
@@ -801,8 +801,64 @@ def draw_bracket_value(img, cfg, el, y_v, colour):
     rgb = rgb + (np.broadcast_to(col_band, rgb.shape) - rgb) * lit_band
     rgb = rgb + (np.broadcast_to(col_stripe, rgb.shape) - rgb) * lit_stripe
     rgb = rgb + (np.array(F['glow'], np.float32) - rgb) * (ms * glow)[..., None]
-    rgb = rgb + (np.array([250, 252, 255], np.float32) - rgb) * np.clip(m * bar, 0, 1)[..., None]
     arr[..., :3] = rgb
+    arr = _fill_relief(arr, cfg, el, (m * below) > 0.5)
+    img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), 'RGBA')
+    return _value_bar(img, cfg, el, y_v)
+
+
+def _fill_relief(arr, cfg, el, lit):
+    """The 3D of the lit part, as on the photo: the outer stripe a glossy tube with a bright outer edge, a dark
+    hairline where it meets the gap, the band lighter by the gap and darker towards the inner line, which stays bright."""
+    P = lambda k: fillet_polyline(to_px(cfg, el[k]))
+    out, par, inner = P('outline'), P('parallel'), P('inner')
+    ys, xs = np.nonzero(lit)
+    if not len(xs):
+        return arr
+    x0, x1, y0, y1 = xs.min() - 2, xs.max() + 3, ys.min() - 2, ys.max() + 3
+    X, Y = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
+    do, dp, di = poly_distance(out, X, Y), poly_distance(par, X, Y), poly_distance(inner, X, Y)
+    sub = arr[y0:y1, x0:x1, :3]
+    L = lit[y0:y1, x0:x1]
+    stripe = L & (do < dp + 0.01) & (do + dp < 40)
+    rest = L & ~stripe
+    f = np.ones(X.shape, np.float32)
+    g = np.zeros(X.shape, np.float32)
+    ts = do / (do + dp + 1e-6)
+    f = np.where(stripe, 0.82 + 0.18 * np.sin(np.pi * np.clip(ts, 0, 1)) ** 0.6, f)
+    g = np.where(stripe, 0.28 * np.exp(-((ts - 0.3) / 0.15) ** 2) + 0.55 * np.clip(1.3 - do, 0, 1), g)
+    tb = dp / (dp + di + 1e-6)
+    f = np.where(rest, 1.06 - 0.3 * smooth(0.55, 1.0, tb), f)
+    g = np.where(rest, 0.22 * np.clip(1 - dp / 4, 0, 1) + 0.45 * np.clip(1.6 - di, 0, 1), g)
+    f = np.where(L & (np.abs(dp) < 1.0), f * 0.72, f)          # the hairline between the stripe and the gap
+    sh = sub * f[..., None]
+    sh = sh + (255 - sh) * g[..., None]
+    arr[y0:y1, x0:x1, :3] = np.where(L[..., None], sh, sub)
+    return arr
+
+
+def _value_bar(img, cfg, el, y_v, ss=6):
+    """The value's bar across the bracket, in relief as on the photo: 6 px tall with rounded ends, white on top
+    shading to light grey at its lower edge, a dark hairline under it."""
+    P = lambda k: fillet_polyline(to_px(cfg, el[k]))
+    xo, xi = x_on(P('outline'), y_v), x_on(P('inner'), y_v)
+    if xo is None or xi is None:
+        return img
+    a, b = min(xo, xi) - 1, max(xo, xi) + 1
+    x0, y0 = int(a) - 2, int(y_v) - 6
+    w, h = int(b - a) + 6, 14
+    m = Image.new('L', (w * ss, h * ss), 0)
+    ImageDraw.Draw(m).rounded_rectangle([(a - x0) * ss, (y_v - 3.5 - y0) * ss, (b - x0) * ss, (y_v + 4.5 - y0) * ss],
+                                        radius=4 * ss, fill=255)
+    m = np.asarray(m.resize((w, h), Image.LANCZOS)).astype(np.float32) / 255.0
+    yy = (np.arange(h) + y0 + 0.5)[:, None]
+    t = np.clip((yy - (y_v - 3.5)) / 8.0, 0, 1)
+    top, bot = np.array([255, 255, 255], np.float32), np.array([196, 202, 214], np.float32)
+    col = top + (bot - top) * smooth(0.45, 1.0, t)[..., None]
+    arr = np.asarray(img).astype(np.float32)
+    sub = arr[y0:y0 + h, x0:x0 + w, :3]
+    sub = sub + (np.broadcast_to(col, sub.shape) - sub) * m[..., None]
+    arr[y0:y0 + h, x0:x0 + w, :3] = sub
     return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), 'RGBA')
 
 
