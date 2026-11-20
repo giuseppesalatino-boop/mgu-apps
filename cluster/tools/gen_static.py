@@ -751,14 +751,140 @@ def compare(cfg, static, ref_path, out_path):
     return out_path
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# the dynamic layer, previewed: what the car draws 30 times a second over the static layer (sampled with a telemetry)
+# ---------------------------------------------------------------------------------------------------------------------
+FILL = {'blue': ((10, 212, 250), (2, 158, 246)), 'red': ((236, 48, 70), (190, 18, 40))}   # top / bottom of a fill
+ZONE = {'yellow': (255, 196, 0), 'red': (235, 30, 40)}
+
+
+def value_y(el, scale, v):
+    """The height (px at the reference's size) of value v on a bracket's scale, between its two neighbouring marks."""
+    sc = el['ticks']['scales'][scale]
+    vals, ys = (sc['values'], sc['y']) if isinstance(sc, dict) else (sc, el['ticks']['y'])
+    pairs = sorted(zip(vals, ys))                              # ascending value
+    vs, yv = [p[0] for p in pairs], [p[1] * 720 for p in pairs]
+    return float(np.interp(v, vs, yv))
+
+
+def _mask(size, poly):
+    m = Image.new('L', size, 0)
+    ImageDraw.Draw(m).polygon(poly, fill=255)
+    return np.asarray(m).astype(np.float32) / 255.0
+
+
+def draw_bracket_value(img, cfg, el, y_v, colour):
+    """A bracket lit from its 0 up to y_v (a fill darker downwards), the white bar across it at the value, a dark
+    hairline under the bar; as on the reference photo (bar 6 px, 2 px gap)."""
+    W, H = cfg['grid']
+    whole = bracket_zones(cfg, el)[0]
+    m = _mask((W, H), whole)
+    Y = np.arange(H, dtype=np.float32)[:, None] + 0.5
+    top, bot = np.array(FILL[colour][0], np.float32), np.array(FILL[colour][1], np.float32)
+    t = np.clip((Y - y_v) / max(640 - y_v, 1), 0, 1)
+    col = top + (bot - top) * t[..., None]
+    lit = m * np.clip(Y - (y_v + 7), 0, 1)
+    bar = m * np.clip(1 - np.abs(Y - (y_v + 0.5)) / 3.2, 0, 1) ** 0.3 * (np.abs(Y - (y_v + 0.5)) < 3.6)
+    arr = np.asarray(img).astype(np.float32)
+    rgb = arr[..., :3]
+    rgb = rgb + (np.broadcast_to(col, rgb.shape) - rgb) * lit[..., None]
+    rgb = rgb + (np.array([250, 252, 255], np.float32) - rgb) * bar[..., None]
+    arr[..., :3] = rgb
+    return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), 'RGBA')
+
+
+def draw_zone(img, cfg, el, y_from, y_to, colour):
+    """A rev zone: the bracket's outer stripe coloured between two heights."""
+    W, H = cfg['grid']
+    m = _mask((W, H), bracket_zones(cfg, el)[2])
+    Y = np.arange(H, dtype=np.float32)[:, None] + 0.5
+    sel = m * ((Y >= min(y_from, y_to)) & (Y <= max(y_from, y_to)))
+    arr = np.asarray(img).astype(np.float32)
+    c = np.array(ZONE[colour], np.float32)
+    arr[..., :3] = arr[..., :3] + (c - arr[..., :3]) * sel[..., None] * 0.9
+    return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), 'RGBA')
+
+
+def draw_gauge_level(img, cfg, el, level, colour=(236, 238, 246)):
+    """A slanted gauge's track lit from the bottom up to level (0..1), its gaps kept."""
+    W, H = cfg['grid']
+    tl, tr_, br, bl = [(p[0] * W, p[1] * H) for p in el['track']]
+    lerp = lambda a, b, t: (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+    span = bl[1] - tl[1]
+    cuts = [0.0] + sorted(el.get('gaps', [])) + [1.0]
+    gp = el.get('gap_px', 0) / 2 / span
+    d = ImageDraw.Draw(img)
+    for i in range(len(cuts) - 1):
+        a, b = cuts[i] + (gp if i else 0), min(level, cuts[i + 1] - (gp if i < len(cuts) - 2 else 0))
+        if b > a:
+            d.polygon([lerp(bl, tl, b), lerp(br, tr_, b), lerp(br, tr_, a), lerp(bl, tl, a)], fill=tuple(colour))
+    return img
+
+
+def draw_dynamic(img, cfg, tel):
+    """The live layer over the static one (both at the reference's size): speed and revs fills with their bars, the
+    rev zones for the oil temperature, the fuel and temperature levels, the big speed and gear."""
+    expand(cfg)
+    E = cfg['elements']
+    L, R = E['bracket_left'], E['bracket_right']
+    eng = cfg.get('engine', 'petrol')
+    rz = R['rev_zones'][eng]
+    # rev zones (oil temperature steps, rpm)
+    oil = tel.get('oil_c', 90)
+    if oil < 60:
+        zones = [('red', rz['cold_red'], None)]
+    elif oil < 75:
+        zones = [('yellow', rz['cold_red'], rz['cold_red'] + 1000), ('red', rz['cold_red'] + 1000, None)]
+    else:
+        zones = [('yellow', rz['yellow'], rz['red']), ('red', rz['red'], None)]
+    top = max(R['ticks']['scales'][rz['scale']]['values'] if isinstance(R['ticks']['scales'][rz['scale']], dict)
+              else R['ticks']['scales'][rz['scale']]) * 1000
+    for colour, a, b in zones:
+        img = draw_zone(img, cfg, R, value_y(R, rz['scale'], a / 1000), value_y(R, rz['scale'], (b or top) / 1000), colour)
+    # the fills
+    img = draw_bracket_value(img, cfg, L, value_y(L, L['numbers']['scale'], tel['speed']), 'blue')
+    img = draw_bracket_value(img, cfg, R, value_y(R, rz['scale'], tel['rpm'] / 1000), 'red')
+    for el in (L, R):                                          # the marks stay on top
+        d = ImageDraw.Draw(img)
+        for x0, y0, x1, y1 in tick_rects(cfg, el):
+            d.rectangle([x0, y0, x1, y1], fill=tuple(el['colors']['tick']))
+    # the gauges
+    img = draw_gauge_level(img, cfg, E['fuel'], tel['fuel'])
+    rng = (50, 130) if eng == 'diesel' else (50, 150)
+    img = draw_gauge_level(img, cfg, E['oil'], (tel['temp_c'] - rng[0]) / (rng[1] - rng[0]))
+    # the big readouts
+    W, H = cfg['grid']
+    for key, val in (('speed', str(int(round(tel['speed'])))), ('gear', tel['gear'])):
+        dg = E[key]['digits']
+        bx = (dg['right'] * W - 330, dg['top'] * H - 4, dg['right'] * W + 4, dg['top'] * H + 62)
+        ImageDraw.Draw(img).rectangle(bx, fill=(0, 0, 0, 0)) if False else None
+        draw_big(img, val, dg['right'] * W, dg['top'] * H, dg, dg['color'])
+    return img
+
+
 def main():
     ap = argparse.ArgumentParser(description='Draw a layout\'s static layer from its config.json')
     ap.add_argument('layout', help='category/layout, e.g. id8/A')
     ap.add_argument('--compare', action='store_true', help='stack it against the reference photo')
+    ap.add_argument('--sim', help='preview the live layer, e.g. speed=176,rpm=4400,gear=M4,fuel=0.6,temp_c=90,oil_c=95,engine=diesel')
     a = ap.parse_args()
     cat, name = a.layout.split('/')
     folder = os.path.join(ROOT, 'layouts', cat, name)
     cfg = json.load(open(os.path.join(folder, 'config.json'), encoding='utf-8'))
+    if a.sim:                                                  # a preview of the live layer, the static file untouched
+        sim = {}
+        for kv in a.sim.split(','):
+            k, v = kv.split('=')
+            sim[k] = v if k in ('gear', 'engine') else float(v)
+        cfg['engine'] = sim.get('engine', cfg.get('engine', 'petrol'))
+        for k in ('speed', 'gear'):                            # the live values replace the photo's samples
+            cfg['elements'][k]['sample'] = ''
+        live = fit_view(draw_dynamic(build_static(cfg), cfg, sim), cfg)
+        out = os.path.join(ROOT, 'design', 'out', '%s_%s_live.png' % (cat, name))
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        live.convert('RGB').save(out)
+        print('live: ' + os.path.relpath(out, ROOT), cfg['view'].get('_fit'))
+        return
     raw = build_static(cfg)                                    # at the reference photo's size
     static = fit_view(raw, cfg)                                # fitted to the car's visible area
     static.save(os.path.join(folder, 'static.png'))
