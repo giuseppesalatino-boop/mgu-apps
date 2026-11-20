@@ -258,6 +258,105 @@
         "bold": 0.012,
         "lift_mph": 4
       }
+    },
+    "bracket_right": {
+      "_about": "The red rev bracket: the exact mirror of bracket_left about x 0.5 (BMW's cluster is symmetric; the photo's right side carries a little residual perspective, 0..17 px). Only its colours, marks' scale, numbers and label are its own, measured on the photo.",
+      "mirror_of": "bracket_left",
+      "colors": {
+        "_about": "RGB medians of the photo inside each mirrored zone, upper legs (y 135..250, where the photo's perspective is under 5 px).",
+        "stripe": [
+          237,
+          44,
+          78
+        ],
+        "gap": [
+          22,
+          5,
+          6
+        ],
+        "band": [
+          82,
+          21,
+          34
+        ],
+        "top_line": [
+          228,
+          142,
+          146
+        ],
+        "inner_line": [
+          222,
+          142,
+          157
+        ],
+        "tick": [
+          193,
+          111,
+          130
+        ]
+      },
+      "ticks": {
+        "_about": "The same heights as the speed scale's marks, the dashes on the inner side of the mirrored parallel.",
+        "y": [
+          0.20903,
+          0.28611,
+          0.36389,
+          0.44167,
+          0.525,
+          0.60694,
+          0.68889,
+          0.77083,
+          0.85278
+        ],
+        "scales": {
+          "8": [
+            8,
+            7,
+            6,
+            5,
+            4,
+            3,
+            2,
+            1,
+            0
+          ]
+        },
+        "start": 4.5,
+        "length": 11.5,
+        "thick": 3
+      },
+      "numbers": {
+        "_about": "Left-aligned 'gap' px right of the outer profile; a touch larger than the speed numbers (the photo's 8 and 5: 25 px tall incl. edge blur).",
+        "scale": "8",
+        "h": 24,
+        "advance": 32.5,
+        "gap": 15,
+        "color": [
+          236,
+          199,
+          214
+        ],
+        "align": "left"
+      }
+    },
+    "label_rpm_unit": {
+      "_about": "The rev scale's unit over the red bracket, fitted to the photo's box (x 1470-1617, y 91-110).",
+      "label": {
+        "text": "1/min x 1000",
+        "font": "BarlowSemiCondensed-Medium.ttf",
+        "box": [
+          0.76562,
+          0.12639,
+          0.84271,
+          0.15278
+        ],
+        "color": [
+          192,
+          175,
+          183
+        ],
+        "bold": 0.012
+      }
     }
   }
 }

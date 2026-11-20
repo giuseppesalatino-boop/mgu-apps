@@ -58,9 +58,26 @@ def to_px(cfg, pts):
     return [(p[0] * W, p[1] * H, p[2] if len(p) > 2 else 0) for p in pts]
 
 
+def expand(cfg):
+    """Elements with "mirror_of" get the source's geometry mirrored about x 0.5 (and its bevel); marks and numbers
+    then go to the other side of their lines ("_side": "right"). Idempotent."""
+    for el in cfg['elements'].values():
+        src = cfg['elements'].get(el.get('mirror_of', ''))
+        if not src:
+            continue
+        for key in ('outline', 'parallel', 'band', 'inner'):
+            if key in src and key not in el:
+                el[key] = [[round(1 - p[0], 6)] + list(p[1:]) for p in src[key]]
+        if 'bevel' in src and 'bevel' not in el:
+            el['bevel'] = src['bevel']
+        el['_side'] = 'right'
+    return cfg
+
+
 def outlines(cfg):
     """Every element's outline as a dense px polyline (the reference for --compare)."""
     out = {}
+    expand(cfg)
     for name, el in cfg['elements'].items():
         for key in ('outline', 'parallel', 'band', 'inner'):
             if key in el:
@@ -76,11 +93,12 @@ def x_on(poly, y):
     return None
 
 
-def tick_rects(cfg):
-    """Every element's graduated marks as [x0, y0, x1, y1] px: level dashes measured from its parallel."""
+def tick_rects(cfg, only=None):
+    """Every element's (or only that one's) graduated marks as [x0, y0, x1, y1] px: level dashes from its parallel."""
     W, H = cfg['grid']
     out = []
-    for el in cfg['elements'].values():
+    expand(cfg)
+    for el in ([only] if only is not None else cfg['elements'].values()):
         t = el.get('ticks')
         if not t or 'parallel' not in el:
             continue
@@ -89,7 +107,9 @@ def tick_rects(cfg):
             y = yn * H
             x = x_on(par, y)
             if x is not None:
-                out.append([x + t['start'], y - t['thick'] / 2, x + t['start'] + t['length'], y + t['thick'] / 2])
+                s = -1 if el.get('_side') == 'right' else 1             # inwards, away from the outer profile
+                xa, xb = x + s * t['start'], x + s * (t['start'] + t['length'])
+                out.append([min(xa, xb), y - t['thick'] / 2, max(xa, xb), y + t['thick'] / 2])
     return out
 
 
@@ -174,7 +194,7 @@ DIGITS = {
     '1': [(0, 0, 18, 5), (11, 0, 18, 22)],
     '2': [_T, _M, _B, (_R, 0, 29, 13.5), (0, 8.5, _L, 22)],
     '3': [_T, (7, 8.5, 29, 13.5), _B, (_R, 0, 29, 22)],
-    '4': [(0, 0, _L, 13.5), _M, (_R, 0, 29, 22)],
+    '4': [(12, 0, 29, 4), ('quad', (12, 0), (19.5, 0), (7, 14.5), (0, 14.5)), (0, 13, 31, 18), (_R, 0, 29, 22)],   # BMW's: a slanted left stroke, the bar low and past the upright
     '5': [_T, (0, 0, _L, 13.5), _M, (_R, 8.5, 29, 22), _B],
     '6': [_T, (0, 0, _L, 22), _M, (_R, 8.5, 29, 22), _B],
     '7': [_T, ('quad', (20.5, 5), (30, 5), (18, 22), (7, 22))],
@@ -184,12 +204,12 @@ DIGITS = {
 DIGIT_W = {'1': 18}
 
 
-def draw_number(img, text, x_right, y_mid, h, advance, color, ss=8):
-    """Text of BMW's digits into img (RGBA, grid px), right edge at x_right, centred on y_mid, h px tall."""
+def draw_number(img, text, x_edge, y_mid, h, advance, color, ss=8, align='right'):
+    """Text of BMW's digits into img (RGBA, grid px), its right (or left) edge at x_edge, centred on y_mid, h px tall."""
     k = h / 22.0
     widths = [DIGIT_W.get(ch, 29) * k for ch in text]
     total = sum(widths) + (advance - 29) * k * (len(text) - 1)
-    x0, y0 = x_right - total, y_mid - h / 2
+    x0, y0 = (x_edge - total if align == 'right' else x_edge), y_mid - h / 2
     W, H = int(total) + 4, int(h) + 4
     m = Image.new('L', (W * ss, H * ss), 0)
     d = ImageDraw.Draw(m)
@@ -218,7 +238,9 @@ def draw_numbers(img, cfg):
         out = fillet_polyline(to_px(cfg, el['outline']))
         for v, yn in zip(el['ticks']['scales'][n['scale']], el['ticks']['y']):
             y = yn * H
-            draw_number(img, str(v), x_on(out, y) - n['gap'], y, n['h'], n['advance'], n['color'])
+            left = n.get('align') == 'left'
+            draw_number(img, str(v), x_on(out, y) + (n['gap'] if left else -n['gap']), y, n['h'], n['advance'],
+                        n['color'], align='left' if left else 'right')
 
 
 FONTS = os.path.join(ROOT, 'tools', 'fonts-src')
@@ -255,6 +277,7 @@ def draw_labels(img, cfg, ss=8):
 
 def build_static(cfg):
     """The static layer, RGBA at grid size: each bracket filled zone by zone (band, gap, stripe), then its lines and marks."""
+    expand(cfg)
     W, H = cfg['grid']
     img = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 255))
     d = ImageDraw.Draw(img)
@@ -271,7 +294,7 @@ def build_static(cfg):
         top = [p for p in out if p[1] <= out[0][1] + 0.5]                       # the top line (level part)
         d.line(sc(top), fill=tuple(col['top_line']), width=3 * SS)
         d.line(sc(fillet_polyline(to_px(cfg, el['inner']))[1:]), fill=tuple(col['inner_line']), width=2 * SS, joint='curve')
-        for x0, y0, x1, y1 in tick_rects(cfg):
+        for x0, y0, x1, y1 in tick_rects(cfg, el):
             d.rectangle([x0 * SS, y0 * SS, x1 * SS, y1 * SS], fill=tuple(col['tick']))
     img = img.resize((W, H), Image.LANCZOS)
     for el in cfg['elements'].values():
