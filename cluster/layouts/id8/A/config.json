@@ -71,7 +71,30 @@
           0
         ]
       ],
-      "_about_inner": "The bracket's inner profile: parallel to the outer one (upper x = -0.594 y + 447.9, lower x = 0.581 y + 42.2), the band wider above the apex (~100 px across) than below it (~71 px); at the top it runs level 4.5 px under the top line to its end (x 665), where a short upright closes the two; at the bottom it runs level at y 625 to x 510 and the slanted end cut (510,625)-(507,635) closes the 10 px foot."
+      "_about_inner": "The bracket's inner profile: parallel to the outer one (upper x = -0.594 y + 447.9, lower x = 0.581 y + 42.2), the band wider above the apex (~100 px across) than below it (~71 px); at the top it runs level 4.5 px under the top line to its end (x 665), where a short upright closes the two; at the bottom it runs level at y 625 to x 510 and the slanted end cut (510,625)-(507,635) closes the 10 px foot.",
+      "parallel": [
+        [
+          0.15218,
+          0.16806,
+          0
+        ],
+        [
+          0.09,
+          0.44861,
+          28
+        ],
+        [
+          0.18051,
+          0.86806,
+          6
+        ],
+        [
+          0.21109,
+          0.86806,
+          0
+        ]
+      ],
+      "_about_parallel": "The parallel just inside the outer profile: the inner edge of the light outer stripe (15 px thick across on the upper leg, 11 on the lower; upper x = -0.5911 y + 363.7, lower x = 0.5755 y - 13.1, measured square to the legs on the photo), from the top line down to y 625 and on along the foot's top edge to the inner profile. The graduated marks sit in the dark gap just inside it."
     }
   }
 }
