@@ -67,6 +67,31 @@ def outlines(cfg):
     return out
 
 
+def x_on(poly, y):
+    """x where the polyline first crosses the height y (None if it doesn't)."""
+    for (xa, ya), (xb, yb) in zip(poly[:-1], poly[1:]):
+        if (ya - y) * (yb - y) <= 0 and ya != yb:
+            return xa + (xb - xa) * (y - ya) / (yb - ya)
+    return None
+
+
+def tick_rects(cfg):
+    """Every element's graduated marks as [x0, y0, x1, y1] px: level dashes measured from its parallel."""
+    W, H = cfg['grid']
+    out = []
+    for el in cfg['elements'].values():
+        t = el.get('ticks')
+        if not t or 'parallel' not in el:
+            continue
+        par = fillet_polyline(to_px(cfg, el['parallel']))
+        for yn in t['y']:
+            y = yn * H
+            x = x_on(par, y)
+            if x is not None:
+                out.append([x + t['start'], y - t['thick'] / 2, x + t['start'] + t['length'], y + t['thick'] / 2])
+    return out
+
+
 def build_static(cfg):
     """The static layer, RGBA at grid size. So far only the outlines are drawn (the first step: geometry)."""
     W, H = cfg['grid']
@@ -74,6 +99,8 @@ def build_static(cfg):
     d = ImageDraw.Draw(img)
     for poly in outlines(cfg).values():
         d.line([(x * SS, y * SS) for x, y in poly], fill=(90, 190, 255, 255), width=3 * SS, joint='curve')
+    for x0, y0, x1, y1 in tick_rects(cfg):
+        d.rectangle([x0 * SS, y0 * SS, x1 * SS, y1 * SS], fill=(215, 225, 240, 255))
     return img.resize((W, H), Image.LANCZOS)
 
 
@@ -97,6 +124,8 @@ def compare(cfg, static, ref_path, out_path):
     d = ImageDraw.Draw(blend)
     for poly in outlines(cfg).values():
         d.line(poly, fill=(255, 0, 255), width=1)
+    for r in tick_rects(cfg):
+        d.rectangle(r, outline=(255, 0, 255))
     for im in (ref, gen, blend):
         grid_overlay(im)
     out = Image.new('RGB', (W, H * 3 + 20), (30, 30, 30))
