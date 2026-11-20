@@ -531,6 +531,20 @@
           ]
         },
         "gap": 2.6
+      },
+      "bevel": {
+        "_about": "Light 3D across each strip (t 0 at its outer edge, 1 at its inner one), multiplying its colour: the rail a tube ('edge' at both rims, a 'gloss' highlight at 'gloss_at'), the track's segments brighter by 'lit' at the outer edge falling off over 'lit_w', and 'shade' darker towards the inner edge.",
+        "rail": {
+          "edge": 0.8,
+          "gloss": 0.12,
+          "gloss_at": 0.4,
+          "gloss_w": 0.22
+        },
+        "track": {
+          "lit": 0.22,
+          "lit_w": 0.18,
+          "shade": 0.12
+        }
       }
     },
     "oil": {

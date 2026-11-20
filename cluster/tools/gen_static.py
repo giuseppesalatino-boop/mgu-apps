@@ -68,7 +68,7 @@ def expand(cfg):
         for key in ('outline', 'parallel', 'band', 'inner', 'rail', 'track'):
             if key in src and key not in el:
                 el[key] = [[round(1 - p[0], 6)] + list(p[1:]) for p in src[key]]
-        for key in ('bevel', 'gaps', 'gap_px', 'colors'):
+        for key in ('bevel', 'gaps', 'gap_px', 'colors', 'labels'):
             if key in src and key not in el:
                 el[key] = src[key]
         el['_side'] = 'right'
@@ -307,6 +307,42 @@ def draw_gauges(d, cfg, sc):
             d.polygon(sc([lerp(bl, tl, b), lerp(br, tr_, b), lerp(br, tr_, a), lerp(bl, tl, a)]), fill=tuple(col['track']))
 
 
+def gauge_bevel(img, cfg, el):
+    """Light 3D on a slanted gauge (img: RGBA at grid size): a brightness profile across the rail and the track,
+    t from 0 at each strip's outer edge (its polygon's first edge) to 1 at the other."""
+    bv = el.get('bevel')
+    if not bv or 'track' not in el:
+        return img
+    W, H = cfg['grid']
+    arr = np.asarray(img).copy()
+    rgb = arr[..., :3].astype(np.float32)
+    for key in ('rail', 'track'):
+        tl, tr_, br, bl = [(p[0] * W, p[1] * H) for p in el[key]]
+        y0, y1 = int(min(tl[1], bl[1])), int(max(tl[1], bl[1])) + 1
+        x0, x1 = int(min(tl[0], tr_[0], br[0], bl[0])) - 1, int(max(tl[0], tr_[0], br[0], bl[0])) + 2
+        X, Y = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
+        f = (Y - tl[1]) / (bl[1] - tl[1])
+        xo = tl[0] + (bl[0] - tl[0]) * f                     # the outer edge at that height
+        xi = tr_[0] + (br[0] - tr_[0]) * f                    # the inner edge
+        t = np.clip((X - xo) / (xi - xo), 0, 1)
+        if key == 'rail':
+            b = bv['rail']
+            m = b['edge'] + (1 - b['edge']) * np.sin(np.pi * t) ** 0.6
+            g = b['gloss'] * np.exp(-((t - b['gloss_at']) / b['gloss_w']) ** 2)
+        else:
+            b = bv['track']
+            m = 1 + b['lit'] * np.exp(-t / b['lit_w']) - b['shade'] * smooth(0.5, 1.0, t)
+            g = np.zeros_like(t)
+        sub = rgb[y0:y1, x0:x1]
+        mk = Image.new('L', (x1 - x0, y1 - y0), 0)           # only the strip itself (not the bracket around it)
+        ImageDraw.Draw(mk).polygon([(px_ - x0, py - y0) for px_, py in (tl, tr_, br, bl)], fill=255)
+        lit = np.asarray(mk) > 127
+        out = np.clip(sub * m[..., None] + (255 - sub * m[..., None]) * g[..., None], 0, 255)
+        rgb[y0:y1, x0:x1] = np.where(lit[..., None], out, sub)
+    arr[..., :3] = (rgb + 0.5).astype(np.uint8)
+    return Image.fromarray(arr, 'RGBA')
+
+
 def draw_pump(img, x, y, w, h, color, ss=8):
     """BMW's fuel pump icon with its arrow (the filler side), drawn in a w x h px box at x, y; traced on the photo's
     35 x 28 px icon."""
@@ -367,6 +403,8 @@ def build_static(cfg):
     for el in cfg['elements'].values():
         if el.get('colors') and 'band' in el:
             img = bevel(img, cfg, el)
+    for el in cfg['elements'].values():
+        img = gauge_bevel(img, cfg, el)
     draw_numbers(img, cfg)
     draw_labels(img, cfg)
     draw_gauge_labels(img, cfg)
