@@ -1,8 +1,8 @@
 {
   "id": "cluster_themes",
   "title": "Cluster Themes",
-  "description": "Redraws the instrument cluster: GT3 race dash, M-style, M view, Vector (with a music panel), Sport, Minimal, Track, Drag, Rally, Retro 80s, Cruise, Dyno (BMW-coloured readout tiles) or Ribbon (with holiday editions), with shift lights, boost, temps, tyres, a G-meter and a 0-60 timer",
-  "version": "0.19.0",
+  "description": "Redraws the instrument cluster in an OEM-faithful iDrive 7 look: Strada (speed and revs either side of the map) and Corsa (the gear between two rev blades, coolant, boost and tyres)",
+  "version": "0.20.0",
   "vendor": "custom",
   "loggingId": "OAC1",
   "iconGlyph": "CLU",
@@ -109,63 +109,19 @@
       "key": "hudLayout",
       "label": "Theme (when not by drive mode)",
       "type": "choice",
-      "default": "gt3",
+      "default": "strada",
       "options": [
         [
           "off",
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
+          "strada",
+          "Strada"
         ],
         [
-          "m",
-          "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
+          "corsa",
+          "Corsa"
         ],
         [
           "grid",
@@ -187,63 +143,19 @@
       "key": "inComfort",
       "label": "In Comfort",
       "type": "choice",
-      "default": "off",
+      "default": "strada",
       "options": [
         [
           "off",
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
+          "strada",
+          "Strada"
         ],
         [
-          "m",
-          "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
+          "corsa",
+          "Corsa"
         ]
       ]
     },
@@ -251,63 +163,19 @@
       "key": "inSport",
       "label": "In Sport",
       "type": "choice",
-      "default": "gt3",
+      "default": "corsa",
       "options": [
         [
           "off",
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
+          "strada",
+          "Strada"
         ],
         [
-          "m",
-          "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
+          "corsa",
+          "Corsa"
         ]
       ]
     },
@@ -315,63 +183,19 @@
       "key": "inEco",
       "label": "In Eco Pro",
       "type": "choice",
-      "default": "off",
+      "default": "strada",
       "options": [
         [
           "off",
           "Off (BMW's own cluster)"
         ],
         [
-          "gt3",
-          "GT3"
+          "strada",
+          "Strada"
         ],
         [
-          "m",
-          "M"
-        ],
-        [
-          "mview",
-          "M view"
-        ],
-        [
-          "vector",
-          "Vector"
-        ],
-        [
-          "sport",
-          "Sport"
-        ],
-        [
-          "minimal",
-          "Minimal"
-        ],
-        [
-          "track",
-          "Track"
-        ],
-        [
-          "drag",
-          "Drag"
-        ],
-        [
-          "rally",
-          "Rally"
-        ],
-        [
-          "retro80s",
-          "Retro 80s"
-        ],
-        [
-          "cruise",
-          "Cruise"
-        ],
-        [
-          "dyno",
-          "Dyno"
-        ],
-        [
-          "ribbon",
-          "Ribbon"
+          "corsa",
+          "Corsa"
         ]
       ]
     },
@@ -878,256 +702,6 @@
           "Off"
         ]
       ]
-    },
-    {
-      "key": "badge",
-      "label": "Badge",
-      "type": "choice",
-      "default": "none",
-      "options": [
-        [
-          "none",
-          "None"
-        ],
-        [
-          "128ti",
-          "128ti"
-        ],
-        [
-          "M135i",
-          "M135i"
-        ],
-        [
-          "228i",
-          "228i"
-        ],
-        [
-          "230i",
-          "230i"
-        ],
-        [
-          "M235i",
-          "M235i"
-        ],
-        [
-          "M240i",
-          "M240i"
-        ],
-        [
-          "320i",
-          "320i"
-        ],
-        [
-          "330i",
-          "330i"
-        ],
-        [
-          "330e",
-          "330e"
-        ],
-        [
-          "M340i",
-          "M340i"
-        ],
-        [
-          "430i",
-          "430i"
-        ],
-        [
-          "M440i",
-          "M440i"
-        ],
-        [
-          "i4 eDrive40",
-          "i4 eDrive40"
-        ],
-        [
-          "i4 M50",
-          "i4 M50"
-        ],
-        [
-          "530i",
-          "530i"
-        ],
-        [
-          "530e",
-          "530e"
-        ],
-        [
-          "540i",
-          "540i"
-        ],
-        [
-          "545e",
-          "545e"
-        ],
-        [
-          "M550i",
-          "M550i"
-        ],
-        [
-          "i5 M60",
-          "i5 M60"
-        ],
-        [
-          "740i",
-          "740i"
-        ],
-        [
-          "760i",
-          "760i"
-        ],
-        [
-          "i7 M70",
-          "i7 M70"
-        ],
-        [
-          "840i",
-          "840i"
-        ],
-        [
-          "M850i",
-          "M850i"
-        ],
-        [
-          "X1 M35i",
-          "X1 M35i"
-        ],
-        [
-          "X2 M35i",
-          "X2 M35i"
-        ],
-        [
-          "X3 30i",
-          "X3 30i"
-        ],
-        [
-          "X3 M40i",
-          "X3 M40i"
-        ],
-        [
-          "X3 M50",
-          "X3 M50"
-        ],
-        [
-          "X4 M40i",
-          "X4 M40i"
-        ],
-        [
-          "X5 40i",
-          "X5 40i"
-        ],
-        [
-          "X5 M60i",
-          "X5 M60i"
-        ],
-        [
-          "X6 M60i",
-          "X6 M60i"
-        ],
-        [
-          "X7 M60i",
-          "X7 M60i"
-        ],
-        [
-          "XM",
-          "XM"
-        ],
-        [
-          "Z4 30i",
-          "Z4 30i"
-        ],
-        [
-          "Z4 M40i",
-          "Z4 M40i"
-        ],
-        [
-          "i4",
-          "i4"
-        ],
-        [
-          "i5",
-          "i5"
-        ],
-        [
-          "i7",
-          "i7"
-        ],
-        [
-          "iX",
-          "iX"
-        ],
-        [
-          "iX M60",
-          "iX M60"
-        ],
-        [
-          "M2",
-          "M2"
-        ],
-        [
-          "M3",
-          "M3"
-        ],
-        [
-          "M4",
-          "M4"
-        ],
-        [
-          "M5",
-          "M5"
-        ],
-        [
-          "M8",
-          "M8"
-        ],
-        [
-          "X3 M",
-          "X3 M"
-        ],
-        [
-          "X4 M",
-          "X4 M"
-        ],
-        [
-          "X5 M",
-          "X5 M"
-        ],
-        [
-          "X6 M",
-          "X6 M"
-        ],
-        [
-          "B3",
-          "B3"
-        ],
-        [
-          "B4",
-          "B4"
-        ],
-        [
-          "B5",
-          "B5"
-        ],
-        [
-          "B8",
-          "B8"
-        ],
-        [
-          "XB7",
-          "XB7"
-        ],
-        [
-          "XD3",
-          "XD3"
-        ]
-      ]
-    },
-    {
-      "key": "badgeBMW",
-      "label": "BMW lettering on the badge",
-      "type": "bool",
-      "default": true
     },
     {
       "key": "demo",

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "name": "M",
+  "name": "Corsa",
   "theme": "mdash",
   "slots": [
     {
@@ -68,11 +68,6 @@
         "min": 50,
         "max": 150
       },
-      "mark": [
-        926,
-        66,
-        1.2
-      ],
       "segbars": [
         {
           "x": 1470,
@@ -168,11 +163,6 @@
         "min": 50,
         "max": 150
       },
-      "mark": [
-        926,
-        66,
-        1.2
-      ],
       "segbars": [
         {
           "x": 1604,
@@ -1422,19 +1412,6 @@
       "h": 22,
       "color": "dim",
       "conn": 1
-    },
-    {
-      "id": "badge",
-      "type": "text",
-      "z": 5,
-      "x": 760,
-      "y": 102,
-      "w": 400,
-      "h": 28,
-      "text": "{{badge}}",
-      "font": "m_badge",
-      "color": "dim",
-      "align": "center"
     },
     {
       "id": "strip_cover_l",

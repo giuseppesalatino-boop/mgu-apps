@@ -61,6 +61,17 @@ riproducono fedelmente i layout originali iDrive 7, con **sfondo `#000000`** e *
 8. **Crash safety**: ogni timer/evento passa dal `_guard` di `hud.js`; una seconda uscita inattesa
    disinstalla l'app sull'auto.
 
+## 2b. Pagina dell'app sul display centrale (MGU)
+
+- La pagina (`shared/page.js`, canvas del kit) usa la palette **Tricolour** del kit
+  (`kit/runtime/themes.js` `m_tricolour`: sfondo `#04060a`, testo `#f4f7fb`, selezione rossa `#ef2b2d`
+  con testo bianco, accento `#81c4ff`, strisce `#81c4ff` / `#16588e` / `#e7222e`), non la palette blu
+  propria di bimmer-lab (`const C` in `page.js`): i colori vengono da `themes.theme('m_tricolour')`,
+  non da esadecimali sparsi.
+- Nell'interfaccia il nome è **"Tricolour"** (senza "M", come True Time ed ECU Live Data, commit
+  "theme names without BMW's M"). Colori sì, logo M no.
+- La pagina mostra solo Strada, Corsa e Off (più le griglie di calibrazione nelle impostazioni).
+
 ## 3. Fedeltà all'OEM: come misurare
 
 - Si parte dalla **foto di riferimento raddrizzata a 1920 × 720** (come `design/photos/ref-m8-cluster.png`

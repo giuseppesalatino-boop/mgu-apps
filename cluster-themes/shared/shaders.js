@@ -457,7 +457,6 @@ uniform vec4 u_line;      // centre line x0, y, x1, cap length
 uniform vec3 u_tyre;      // the tyre block's car glyph: centre x, y, scale (0 = none)
 uniform vec4 u_gaugeL;    // left gauge centre x, y, radius, value 0..1
 uniform vec4 u_gaugeR;    // right gauge
-uniform vec3 u_mark;      // tricolour mark x, y, scale (0 = none)
 uniform vec3 u_red;
 uniform vec4 u_seg0;      // setup level bars x, y, w, h (a height of 0: none)
 uniform vec4 u_seg1;
@@ -642,18 +641,6 @@ void main() {
         c.a *= clamp(hd + 0.5, 0.0, 1.0);
     }
 
-    // tricolour mark: three slanted bars
-    if (u_mark.z > 0.0) {
-        vec2 m = (p - u_mark.xy) / u_mark.z;
-        if (m.y > -1.0 && m.y < 21.0 && m.x > -2.0 && m.x < 60.0) {
-            float lx = m.x - 7.0 * (1.0 - m.y / 20.0);
-            float i = floor(lx / 16.0);
-            float fx = lx - i * 16.0;
-            float inside = cov((max(abs(fx - 6.5) - 6.5, abs(m.y - 10.0) - 10.0)) * u_mark.z);
-            vec3 mc = i < 0.5 ? vec3(0.31, 0.71, 1.0) : (i < 1.5 ? vec3(0.17, 0.29, 0.78) : vec3(0.9, 0.13, 0.17));
-            if (i >= 0.0 && i <= 2.0) c = over(vec4(mc, inside), c);
-        }
-    }
     gl_FragColor = c;
 }
 `;
