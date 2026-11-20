@@ -92,15 +92,37 @@ def tick_rects(cfg):
     return out
 
 
+def bracket_zones(cfg, el):
+    """A bracket's zones as polygons (px): the whole bracket, outer profile to the fill track's edge, and outer profile
+    to the parallel. Each runs down the outer profile, back up its inner line through the foot's end cut, and closes
+    along the top line."""
+    P = lambda k: fillet_polyline(to_px(cfg, el[k]))
+    out = P('outline')
+    end = [(el['inner'][-2][0] * cfg['grid'][0], el['inner'][-2][1] * cfg['grid'][1])]     # the foot's upper end
+    zone = lambda k: out + end + P(k)[::-1]                # closes back along the top line
+    return zone('inner'), zone('band'), zone('parallel')
+
+
 def build_static(cfg):
-    """The static layer, RGBA at grid size. So far only the outlines are drawn (the first step: geometry)."""
+    """The static layer, RGBA at grid size: each bracket filled zone by zone (band, gap, stripe), then its lines and marks."""
     W, H = cfg['grid']
     img = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 255))
     d = ImageDraw.Draw(img)
-    for poly in outlines(cfg).values():
-        d.line([(x * SS, y * SS) for x, y in poly], fill=(90, 190, 255, 255), width=3 * SS, joint='curve')
-    for x0, y0, x1, y1 in tick_rects(cfg):
-        d.rectangle([x0 * SS, y0 * SS, x1 * SS, y1 * SS], fill=(215, 225, 240, 255))
+    sc = lambda poly: [(x * SS, y * SS) for x, y in poly]
+    for el in cfg['elements'].values():
+        col = el.get('colors')
+        if not col or 'band' not in el:
+            continue
+        whole, to_band, to_par = bracket_zones(cfg, el)
+        d.polygon(sc(whole), fill=tuple(col['band']))
+        d.polygon(sc(to_band), fill=tuple(col['gap']))
+        d.polygon(sc(to_par), fill=tuple(col['stripe']))
+        out = fillet_polyline(to_px(cfg, el['outline']))
+        top = [p for p in out if p[1] <= out[0][1] + 0.5]                       # the top line (level part)
+        d.line(sc(top), fill=tuple(col['top_line']), width=3 * SS)
+        d.line(sc(fillet_polyline(to_px(cfg, el['inner']))[1:]), fill=tuple(col['inner_line']), width=2 * SS, joint='curve')
+        for x0, y0, x1, y1 in tick_rects(cfg):
+            d.rectangle([x0 * SS, y0 * SS, x1 * SS, y1 * SS], fill=tuple(col['tick']))
     return img.resize((W, H), Image.LANCZOS)
 
 

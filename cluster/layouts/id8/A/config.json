@@ -180,7 +180,40 @@
           0
         ]
       ],
-      "_about_band": "The blue band's outer edge, just right of the graduated marks: 33 px in from the outer profile across the upper leg, 27 across the lower (upper x = -0.5911 y + 384.6, lower x = 0.5755 y + 5.3), from the top line to y 625 and on along the foot to the inner profile. Between it and the inner profile is the band that fills light blue up to the speed (drawn last, it moves)."
+      "_about_band": "The blue band's outer edge, just right of the graduated marks: 33 px in from the outer profile across the upper leg, 27 across the lower (upper x = -0.5911 y + 384.6, lower x = 0.5755 y + 5.3), from the top line to y 625 and on along the foot to the inner profile. Between it and the inner profile is the band that fills light blue up to the speed (drawn last, it moves).",
+      "colors": {
+        "_about": "RGB medians of the photo inside each zone, on the upper legs (the lower part of the photo is lit by the speed fill).",
+        "stripe": [
+          14,
+          154,
+          235
+        ],
+        "gap": [
+          3,
+          8,
+          18
+        ],
+        "band": [
+          11,
+          58,
+          137
+        ],
+        "top_line": [
+          155,
+          208,
+          230
+        ],
+        "inner_line": [
+          120,
+          185,
+          237
+        ],
+        "tick": [
+          158,
+          173,
+          211
+        ]
+      }
     }
   }
 }
