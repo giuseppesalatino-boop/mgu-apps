@@ -295,9 +295,12 @@ def draw_gauges(d, cfg, sc):
             continue
         col = el['colors']
         P = lambda k: [(p[0] * W, p[1] * H) for p in el[k]]
-        d.polygon(sc(P('rail')), fill=tuple(col['rail']))
-        tl, tr_, br, bl = P('track')
         lerp = lambda a, b, t: (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+        rtl, rtr, rbr, rbl = P('rail')
+        for z in el.get('rail_zones') or [{'from': 0.0, 'to': 1.0, 'color': col['rail']}]:
+            a, b = z['from'], z['to']                     # fractions from the bottom (cold / empty) end
+            d.polygon(sc([lerp(rbl, rtl, b), lerp(rbr, rtr, b), lerp(rbr, rtr, a), lerp(rbl, rtl, a)]), fill=tuple(z['color']))
+        tl, tr_, br, bl = P('track')
         span = bl[1] - tl[1]
         cuts = [0.0] + sorted(el.get('gaps', [])) + [1.0]
         g = el.get('gap_px', 0) / 2 / span
@@ -363,23 +366,78 @@ def draw_pump(img, x, y, w, h, color, ss=8):
     img.alpha_composite(layer, (int(round(x)) - 2, int(round(y)) - 2))
 
 
+def draw_oil(img, x, y, w, h, color, ss=8):
+    """The ISO 2575 engine oil temperature symbol (an oil can with a thermometer, a drop from the spout), in BMW's
+    style, traced on the photo's 48 x 32 px icon."""
+    k = (w / 48.0, h / 32.0)
+    m = Image.new('L', (int(w + 4) * ss, int(h + 4) * ss), 0)
+    d = ImageDraw.Draw(m)
+    P = lambda px_, py: ((2 + px_ * k[0]) * ss, (2 + py * k[1]) * ss)
+    lw = int(round(2.6 * ss))
+    lt = int(round(2.2 * ss))
+    d.rounded_rectangle([P(23.5, -3), P(26.5, 16)], radius=1.5 * ss, fill=255)            # the thermometer
+    d.ellipse([P(22, 13.5), P(28, 19.5)], fill=255)                                        # its bulb
+    for ty in (0, 4, 8):
+        d.line([P(27.5, ty), P(30.5, ty)], fill=255, width=lt)                             # its scale
+    for ly in (8.5, 12):
+        d.line([P(11, ly), P(20.5, ly)], fill=255, width=lt)                               # the oil level lines
+    d.line([P(2, 9), P(5.5, 7.5), P(8.5, 10.5), P(5, 13.5), P(1, 12), P(2, 9)], fill=255, width=lw, joint='curve')  # handle
+    d.line([P(6, 13), P(10, 21.5), P(11, 24), P(30, 24), P(35.5, 16), P(38, 11.5), P(41.5, 10.5)], fill=255,
+           width=lw, joint='curve')                                                        # the can and its spout
+    d.ellipse([P(39.5, 17), P(43.5, 21.5)], fill=255)                                      # the drop
+    m = m.resize((int(w + 4), int(h + 4)), Image.LANCZOS)
+    layer = Image.new('RGBA', m.size, tuple(color) + (0,))
+    layer.putalpha(m)
+    img.alpha_composite(layer, (int(round(x)) - 2, int(round(y)) - 2))
+
+
+def draw_coolant(img, x, y, w, h, color, ss=8):
+    """The ISO 2575 engine coolant temperature symbol (a thermometer standing in two waves), in the oil icon's style
+    and box."""
+    k = (w / 48.0, h / 32.0)
+    m = Image.new('L', (int(w + 4) * ss, int(h + 4) * ss), 0)
+    d = ImageDraw.Draw(m)
+    P = lambda px_, py: ((2 + px_ * k[0]) * ss, (2 + py * k[1]) * ss)
+    lw, lt = int(round(2.6 * ss)), int(round(2.2 * ss))
+    d.rounded_rectangle([P(22.5, -3), P(25.5, 13)], radius=1.5 * ss, fill=255)            # the thermometer
+    d.ellipse([P(21, 10.5), P(27, 16.5)], fill=255)                                        # its bulb
+    for ty in (-1, 3, 7):
+        d.line([P(26.5, ty), P(30, ty)], fill=255, width=lt)                               # its scale
+    for wy in (20.5, 26):                                                                  # the two waves
+        pts = [P(6 + i * 1.5, wy + 1.6 * math.sin(i * 1.5 / 36 * 4 * math.pi)) for i in range(25)]
+        d.line(pts, fill=255, width=lw, joint='curve')
+    m = m.resize((int(w + 4), int(h + 4)), Image.LANCZOS)
+    layer = Image.new('RGBA', m.size, tuple(color) + (0,))
+    layer.putalpha(m)
+    img.alpha_composite(layer, (int(round(x)) - 2, int(round(y)) - 2))
+
+
 def draw_gauge_labels(img, cfg):
     W, H = cfg['grid']
     for el in cfg['elements'].values():
         lb = el.get('labels') if 'track' in el else None
-        if not lb or el.get('_side') == 'right':
+        if not lb:
             continue
+        if 'variants' in lb:                                      # picked by the engine (petrol / diesel)
+            lb = dict(lb, **lb['variants'][cfg.get('engine', 'petrol')])
         for it in lb['items']:
             draw_number(img, it['text'], it['at'][0] * W, it['at'][1] * H, it['h'], 32.5, lb['color'],
-                        align='left', sx=lb.get('sx', 1.0), gap=lb.get('gap'))
+                        align=it.get('align', 'left'), sx=lb.get('sx', 1.0), gap=lb.get('gap'))
+        for tx in lb.get('text', []):
+            draw_labels(img, {'grid': cfg['grid'], 'elements': {'t': {'label': tx}}})
         ic = lb.get('icon')
-        if ic and ic['kind'] == 'pump':
-            draw_pump(img, ic['at'][0] * W, ic['at'][1] * H, ic['size'][0], ic['size'][1], lb['color'])
+        if ic:
+            draw = {'pump': draw_pump, 'oil': draw_oil, 'coolant': draw_coolant}[ic['kind']]
+            draw(img, ic['at'][0] * W, ic['at'][1] * H, ic['size'][0], ic['size'][1], lb['color'])
 
 
 def build_static(cfg):
     """The static layer, RGBA at grid size: each bracket filled zone by zone (band, gap, stripe), then its lines and marks."""
     expand(cfg)
+    for el in cfg['elements'].values():                        # the engine picks the rev scale
+        rz = el.get('rev_zones')
+        if rz and cfg.get('engine') in rz and el.get('numbers'):
+            el['numbers']['scale'] = rz[cfg['engine']]['scale']
     W, H = cfg['grid']
     img = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 255))
     d = ImageDraw.Draw(img)

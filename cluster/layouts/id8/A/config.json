@@ -548,8 +548,178 @@
       }
     },
     "oil": {
-      "_about": "The oil temperature gauge inside the rev bracket: the fuel gauge's mirror about x 0.5; its own colours and scale come next.",
-      "mirror_of": "fuel"
+      "_about": "The oil temperature gauge inside the rev bracket: the fuel gauge's exact mirror about x 0.5 (rail outside, 4-segment track); its rail carries the zones (red at the hot end, blue at the cold end, fractions from the cold end), its labels are right-aligned towards the gauge, measured on the photo. Petrol: engine oil, 50-150 C. Diesel: coolant, 50-130 C, the middle mark at 90.",
+      "mirror_of": "fuel",
+      "rail_zones": [
+        {
+          "from": 0.0,
+          "to": 0.122,
+          "color": [
+            120,
+            181,
+            226
+          ]
+        },
+        {
+          "from": 0.122,
+          "to": 0.878,
+          "color": [
+            223,
+            223,
+            234
+          ]
+        },
+        {
+          "from": 0.9,
+          "to": 1.0,
+          "color": [
+            226,
+            60,
+            92
+          ]
+        }
+      ],
+      "labels": {
+        "sx": 0.7,
+        "gap": 2.6,
+        "color": [
+          234,
+          235,
+          240
+        ],
+        "text": [
+          {
+            "text": "\u00b0C",
+            "font": "BarlowSemiCondensed-Medium.ttf",
+            "box": [
+              0.76979,
+              0.64722,
+              0.7849,
+              0.68056
+            ],
+            "color": [
+              214,
+              215,
+              221
+            ],
+            "bold": 0.012
+          }
+        ],
+        "variants": {
+          "petrol": {
+            "items": [
+              {
+                "text": "150",
+                "at": [
+                  0.8,
+                  0.60694
+                ],
+                "h": 21,
+                "align": "right"
+              },
+              {
+                "text": "100",
+                "at": [
+                  0.77396,
+                  0.71736
+                ],
+                "h": 22,
+                "align": "right"
+              },
+              {
+                "text": "50",
+                "at": [
+                  0.75104,
+                  0.825
+                ],
+                "h": 22,
+                "align": "right"
+              }
+            ],
+            "icon": {
+              "kind": "oil",
+              "at": [
+                0.74115,
+                0.75278
+              ],
+              "size": [
+                48,
+                32
+              ]
+            },
+            "range_c": [
+              50,
+              150
+            ]
+          },
+          "diesel": {
+            "items": [
+              {
+                "text": "130",
+                "at": [
+                  0.8,
+                  0.60694
+                ],
+                "h": 21,
+                "align": "right"
+              },
+              {
+                "text": "90",
+                "at": [
+                  0.77396,
+                  0.71736
+                ],
+                "h": 22,
+                "align": "right"
+              },
+              {
+                "text": "50",
+                "at": [
+                  0.75104,
+                  0.825
+                ],
+                "h": 22,
+                "align": "right"
+              }
+            ],
+            "icon": {
+              "kind": "coolant",
+              "at": [
+                0.74115,
+                0.75278
+              ],
+              "size": [
+                48,
+                32
+              ]
+            },
+            "range_c": [
+              50,
+              130
+            ]
+          }
+        }
+      },
+      "warn": {
+        "_about": "The track's fill colour follows the temperature (dynamic layer), like the rev zones: blue (the speed bracket's stripe colour) up to cold_c, meaning a cold engine, then the normal fill. Hot threshold: proposed, to confirm.",
+        "cold_c": 65,
+        "cold_color": [
+          14,
+          154,
+          235
+        ],
+        "hot_c": {
+          "petrol": 140,
+          "diesel": 120
+        },
+        "hot_color": [
+          235,
+          30,
+          40
+        ]
+      }
     }
-  }
+  },
+  "engine": "petrol",
+  "_about_engine": "'engine' (set by the app): petrol or diesel. It picks the rev scale (8 or 6, rev_zones) and the right gauge: oil 50-150 C (petrol) or coolant 50-130 C with its middle mark at 90 (diesel), each with its own icon."
 }
