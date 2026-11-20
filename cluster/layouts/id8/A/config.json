@@ -701,7 +701,7 @@
         }
       },
       "warn": {
-        "_about": "The track's fill colour follows the temperature (dynamic layer), like the rev zones: blue (the speed bracket's stripe colour) up to cold_c, meaning a cold engine, then the normal fill. Hot threshold: proposed, to confirm.",
+        "_about": "The track's fill colour follows the temperature (dynamic layer), like the rev zones: blue (the speed bracket's stripe colour) up to cold_c, meaning a cold engine, then the normal fill. Red from hot_c (oil 140, coolant 120).",
         "cold_c": 65,
         "cold_color": [
           14,
