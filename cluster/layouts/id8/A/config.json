@@ -1,0 +1,44 @@
+{
+  "_about": "ID8 layout A (reference photo 3): every position is normalized to the 1920x720 calibration grid (x / 1920, y / 720); radii are px of that grid. Measured on design/refs/id8/A.png (the photo straightened on the backlit panel's corners). Edit here, then: python3 cluster/tools/gen_static.py id8/A",
+  "grid": [
+    1920,
+    720
+  ],
+  "elements": {
+    "bracket_left": {
+      "_about": "The blue speed bracket's outer profile, from the end of its top line round the apex to the tip of its foot. Legs fitted on the photo's pixels (max error 1.1 px): upper x = -0.5911 y + 346.31, lower x = 0.5755 y - 25.78; the right bracket is its mirror about x 0.5 (checked later on the red one).",
+      "outline": [
+        [
+          0.34115,
+          0.16389,
+          0
+        ],
+        [
+          0.14404,
+          0.16389,
+          8
+        ],
+        [
+          0.08218,
+          0.44299,
+          33
+        ],
+        [
+          0.18411,
+          0.91528,
+          10
+        ],
+        [
+          0.23698,
+          0.91528,
+          40
+        ],
+        [
+          0.30729,
+          0.89306,
+          0
+        ]
+      ]
+    }
+  }
+}
