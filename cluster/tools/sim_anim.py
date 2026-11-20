@@ -26,6 +26,7 @@ FPS = 30
 RATIO = [9.0, 15.0, 22.0, 29.5, 37.0, 44.0]
 SHIFT = {'diesel': 4720, 'petrol': 7100}
 IDLE = {'diesel': 800, 'petrol': 900}
+HOLD = 0.7                                                    # seconds held past the last red before each shift
 
 
 def scenario(t, eng):
@@ -44,6 +45,10 @@ def scenario(t, eng):
             rpm = lo + (top - lo) * (1 - (1 - f) ** 1.6)
             return {'speed': rpm / 1000 * RATIO[i], 'rpm': rpm, 'gear': 'M%d' % (i + 1)}
         t -= dur
+        if t < HOLD:                                         # held past the last red a moment: the lights flash
+            rpm = top + 40 * t / HOLD
+            return {'speed': rpm / 1000 * RATIO[i], 'rpm': rpm, 'gear': 'M%d' % (i + 1)}
+        t -= HOLD
         if t < 0.15:                                         # the shift itself: the rpm falls to the next gear's
             nxt = top * RATIO[i] / RATIO[min(i + 1, len(RATIO) - 1)]
             rpm = top + (nxt - top) * (t / 0.15)
@@ -82,7 +87,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('layout')
     ap.add_argument('--engine', default='diesel')
-    ap.add_argument('--seconds', type=float, default=16.5)
+    ap.add_argument('--seconds', type=float, default=21)
     a = ap.parse_args()
     cat, name = a.layout.split('/')
     cfg_path = os.path.join(ROOT, 'layouts', cat, name, 'config.json')
@@ -96,6 +101,10 @@ def main():
     os.makedirs(os.path.dirname(out), exist_ok=True)
     subprocess.check_call(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(FPS), '-i', os.path.join(tmp, '%05d.png'),
                            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', out])
+    gif = out[:-4] + '.gif'                                   # 30 fps too: at 15 the every-frame flash would vanish
+    subprocess.check_call(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(FPS), '-i', os.path.join(tmp, '%05d.png'),
+                           '-vf', 'crop=1500:540:210:80,scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];'
+                           '[b][p]paletteuse=dither=bayer:bayer_scale=4', gif])
     shutil.rmtree(tmp)
     print('anim: ' + os.path.relpath(out, ROOT))
 

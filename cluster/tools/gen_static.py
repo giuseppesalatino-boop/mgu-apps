@@ -969,7 +969,7 @@ def light_numbers(img, cfg, el, y_v):
     for v, yn in zip(vals, ys):
         y = yn * H
         d = abs(y - y_v) / step
-        w = float(np.clip(1 - (d - lt['full']) / (lt['fade'] - lt['full']), 0, 1))
+        w = float(1 - smooth(lt['full'], lt['fade'], d))           # a smooth fade with the distance
         if w <= 0:
             continue
         layer = Image.new('RGBA', img.size, (0, 0, 0, 0))

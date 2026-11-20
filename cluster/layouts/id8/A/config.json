@@ -236,14 +236,14 @@
           228
         ],
         "lit": {
-          "_about": "Live: a number turns white as the value nears it (fully within 'full' marks of it, fading out by 'fade' marks), as on BMW's M layouts; otherwise it stays in the bracket's dim colour ('color').",
+          "_about": "Live: a number turns white as the value nears it, fading smoothly with the distance (white at the mark, back to its dim colour 'fade' marks away), as on BMW's M layouts.",
           "color": [
             245,
             247,
             250
           ],
-          "full": 0.75,
-          "fade": 1.25
+          "full": 0.0,
+          "fade": 1.0
         }
       }
     },
@@ -368,14 +368,14 @@
         ],
         "align": "left",
         "lit": {
-          "_about": "Live: a number turns white as the value nears it (fully within 'full' marks of it, fading out by 'fade' marks), as on BMW's M layouts; otherwise it stays in the bracket's dim colour ('color').",
+          "_about": "Live: a number turns white as the value nears it, fading smoothly with the distance (white at the mark, back to its dim colour 'fade' marks away), as on BMW's M layouts.",
           "color": [
             245,
             247,
             250
           ],
-          "full": 0.75,
-          "fade": 1.25
+          "full": 0.0,
+          "fade": 1.0
         }
       },
       "rev_zones": {
