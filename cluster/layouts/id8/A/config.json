@@ -1001,8 +1001,8 @@
       ],
       "wing_right": [
         [
-          0.82031,
-          0.35833,
+          0.8201,
+          0.35542,
           2
         ],
         [
@@ -1016,12 +1016,12 @@
           3
         ],
         [
-          0.80625,
+          0.80677,
           0.41389,
           2
         ]
       ],
-      "_about_right": "Not symmetric at the top right either: the panel's right edge runs on the wing's mirrored line (x = 1521 + 0.545 (y - 164)) down to (1570, 252) and turns in to the gear cut-out, so there is no wing over it at the top; the right wing is a small chevron below (258..343). Measured on the photo's blue mask. Top-left: the panel's corner is nearly sharp, the wing's outer corner carries the big round."
+      "_about_right": "Not symmetric at the top right either: the panel's right edge runs on the wing's mirrored line (x = 1521 + 0.545 (y - 164)) down to (1570, 252) and turns in to the gear cut-out, so there is no wing over it at the top; the right wing is a small chevron below (258..343). Measured on the photo's blue mask. Top-left: the panel's corner is nearly sharp, the wing's outer corner carries the big round. The right wing's upper left edge runs parallel to the panel's edge (x = 1570 - 0.609 (y - 252)), 7 px off it, so the black gap is even."
     },
     "speed": {
       "_about": "The speed in the speed cut-out: BMW's big squared digits (tools/gen_static.py big_glyph: 76 x 59 px, bars 10, uprights 22, measured on the photo's 57), right edge at x 540, top at y 315, 10 px apart; always full size: three digits grow to the left over the cut-out's slanted side. Dynamic: drawn by the live layer, sampled here with the photo's value.",
