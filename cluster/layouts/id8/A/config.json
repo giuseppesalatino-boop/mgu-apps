@@ -213,6 +213,21 @@
           173,
           211
         ]
+      },
+      "bevel": {
+        "_about": "The 3D look, as a brightness profile across each zone (t: 0 at its outer edge, 1 at its inner edge), multiplying the zone's colour. stripe: a tube, 'edge' at both rims rising to 1 in the middle, plus a glossy highlight of 'gloss' (added towards white) centred at t 'gloss_at', 'gloss_w' wide. band: a hollow, 'edge' at the gap side rising to 1 over 'rise' of its width, falling to 'inner' just before the inner line. soft: px over which every edge is feathered.",
+        "stripe": {
+          "edge": 0.72,
+          "gloss": 0.22,
+          "gloss_at": 0.32,
+          "gloss_w": 0.16
+        },
+        "band": {
+          "edge": 0.85,
+          "rise": 0.15,
+          "inner": 0.4
+        },
+        "soft": 1.2
       }
     }
   }

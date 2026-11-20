@@ -14,7 +14,8 @@ import json
 import math
 import os
 
-from PIL import Image, ImageDraw
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SS = 4                      # supersampling: drawn 4x larger, scaled down
@@ -103,6 +104,67 @@ def bracket_zones(cfg, el):
     return zone('inner'), zone('band'), zone('parallel')
 
 
+def poly_distance(poly, X, Y):
+    """Distance (px) from every point of the grids X, Y to the polyline."""
+    best = np.full(X.shape, 1e9)
+    for (ax, ay), (bx, by) in zip(poly[:-1], poly[1:]):
+        ex, ey = bx - ax, by - ay
+        L2 = ex * ex + ey * ey or 1e-9
+        h = np.clip(((X - ax) * ex + (Y - ay) * ey) / L2, 0, 1)
+        best = np.minimum(best, np.hypot(X - ax - ex * h, Y - ay - ey * h))
+    return best
+
+
+def smooth(e0, e1, x):
+    t = np.clip((x - e0) / (e1 - e0), 0, 1)
+    return t * t * (3 - 2 * t)
+
+
+def bevel(img, cfg, el):
+    """The 3D look on a bracket already filled flat (img: RGBA at grid size): a brightness profile across the stripe
+    (a tube with a glossy highlight) and across the band (a hollow), from each pixel's distances to the zone's two
+    edges, as config 'bevel' says."""
+    bv = el.get('bevel')
+    if not bv:
+        return img
+    P = lambda k: fillet_polyline(to_px(cfg, el[k]))
+    out, par, band, inner = P('outline'), P('parallel'), P('band'), P('inner')
+    xs = [p[0] for p in out + inner]
+    ys = [p[1] for p in out + inner]
+    x0, x1, y0, y1 = int(min(xs)) - 2, int(max(xs)) + 3, int(min(ys)) - 2, int(max(ys)) + 3
+    X, Y = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
+    whole, to_band, to_par = bracket_zones(cfg, el)
+
+    def mask(poly):
+        m = Image.new('L', (x1 - x0, y1 - y0), 0)
+        ImageDraw.Draw(m).polygon([(x - x0, y - y0) for x, y in poly], fill=255)
+        return np.asarray(m.filter(ImageFilter.GaussianBlur(bv.get('soft', 1.0)))) / 255.0
+
+    m_par, m_band = mask(to_par), mask(to_band)
+    m_fill = mask(whole) - m_band
+    rgb = np.asarray(img, np.float32)[y0:y1, x0:x1, :3].copy()
+    # the stripe: a tube, darker at both rims, with a glossy highlight
+    st = bv['stripe']
+    d_o, d_p = poly_distance(out, X, Y), poly_distance(par, X, Y)
+    t = d_o / (d_o + d_p + 1e-6)
+    f = st['edge'] + (1 - st['edge']) * np.sin(np.pi * np.clip(t, 0, 1)) ** 0.6
+    g = st['gloss'] * np.exp(-((t - st['gloss_at']) / st['gloss_w']) ** 2)
+    shaded = np.clip(rgb * f[..., None] + (255 - rgb * f[..., None]) * g[..., None], 0, 255)
+    rgb = rgb + (shaded - rgb) * np.clip(m_par, 0, 1)[..., None]
+    # the band: a hollow, rising from the gap, a touch darker before the inner line
+    bd = bv['band']
+    d_b, d_i = poly_distance(band, X, Y), poly_distance(inner, X, Y)
+    t = d_b / (d_b + d_i + 1e-6)
+    f = bd['edge'] + (1 - bd['edge']) * smooth(0, bd['rise'], t)
+    f = f - (1 - bd['inner']) * smooth(0.72, 0.95, t)
+    col = np.array(el['colors']['band'], np.float32)
+    keep_line = smooth(1.2, 2.4, d_i)                                   # the inner line stays as drawn
+    rgb = rgb + (col * f[..., None] - rgb) * (np.clip(m_fill, 0, 1) * keep_line)[..., None]
+    arr = np.asarray(img).copy()
+    arr[y0:y1, x0:x1, :3] = np.clip(rgb + 0.5, 0, 255).astype(np.uint8)
+    return Image.fromarray(arr, 'RGBA')
+
+
 def build_static(cfg):
     """The static layer, RGBA at grid size: each bracket filled zone by zone (band, gap, stripe), then its lines and marks."""
     W, H = cfg['grid']
@@ -123,7 +185,11 @@ def build_static(cfg):
         d.line(sc(fillet_polyline(to_px(cfg, el['inner']))[1:]), fill=tuple(col['inner_line']), width=2 * SS, joint='curve')
         for x0, y0, x1, y1 in tick_rects(cfg):
             d.rectangle([x0 * SS, y0 * SS, x1 * SS, y1 * SS], fill=tuple(col['tick']))
-    return img.resize((W, H), Image.LANCZOS)
+    img = img.resize((W, H), Image.LANCZOS)
+    for el in cfg['elements'].values():
+        if el.get('colors') and 'band' in el:
+            img = bevel(img, cfg, el)
+    return img
 
 
 def grid_overlay(img, step=50):
