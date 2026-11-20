@@ -69,29 +69,6 @@
         ],
         "output": "vendor/idrive7-apps/dist/{id}@{version}.tgz"
       }
-    },
-    {
-      "id": "dkombi4_layouts",
-      "kind": "app",
-      "path": "cluster-themes/apps/dkombi4_layouts",
-      "title": "Quadro Strumenti",
-      "description": "Il quadro strumenti ridisegnato con l'aspetto originale iDrive 7: Strada e Corsa",
-      "mguHmi": [
-        "ID7"
-      ],
-      "icon": "icon.png",
-      "build": {
-        "python": "cluster-themes/kit/tools/build.py",
-        "args": [
-          "{id}"
-        ],
-        "sdk": "cluster-themes/oap-sdk",
-        "shared": [
-          "cluster-themes/kit",
-          "cluster-themes/shared"
-        ],
-        "output": "cluster-themes/dist/{id}@{version}.tgz"
-      }
     }
   ]
 }

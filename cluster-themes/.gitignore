@@ -1,8 +1,0 @@
-dist/
-oap-sdk/
-*.log
-bench/.data/
-preview/
-__pycache__/
-design/photos/
-design/previews-src/
