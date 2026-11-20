@@ -794,13 +794,8 @@ class HudApp {
                 },
             },
         };
-        // now playing (the Vector layouts' music panel): the head unit's own media state, front screen only. Optional
-        // (app.json): not every unit may have it, and whether CarPlay fills it is not known yet. Added last, so the
-        // one-at-a-time SOME/IP setup (signals.js) reaches every vehicle signal before it, whatever this one does
-        extra[MEDIA_IF] = {
-            playerMetadata: (v) => this._mediaFeed('meta', v),
-            trackProgress: (v) => this._mediaFeed('progress', v),
-        };
+        // (no HmiMediaState: on a G31 520d its instance is "HMI_CID", not "1", and the Store's install fails on it
+        // even when marked _optional; the music panel it fed is gone with the Vector theme)
         this.car = new Car(this.ctx, ['rpm', 'speed', 'temps', 'accel', 'gear', 'torque'], extra);
         // "Play demo": this.car becomes the show's stand-in (the car's own data unless the show plays)
         this.demo = new DemoShow(this.car, this._demoHooks(), this.log);

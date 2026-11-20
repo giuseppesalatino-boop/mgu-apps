@@ -52,7 +52,13 @@ riproducono fedelmente i layout originali iDrive 7, con **sfondo `#000000`** e *
    riferimento stanno in `design/photos/` fuori dal repo.
 6. **Font**: Barlow pre-cotto in atlanti (`apps/cluster_themes/hud/fonts/*.json`, `tools/bake_fonts.py`);
    un nuovo corpo o glifo si cuoce da lì, mai da un font BMW. L'auto non rasterizza font.
-7. **Crash safety**: ogni timer/evento passa dal `_guard` di `hud.js`; una seconda uscita inattesa
+7. **Segnali e installazione dallo Store**: il build scrive per ogni interfaccia di `app.json` `signals`
+   l'istanza `_instances` (default `"1"`), e l'installazione dallo Store **fallisce del tutto** se l'unità
+   non ha quell'istanza, anche con `_optional` (l'install in-place non scarta l'interfaccia). Caso reale:
+   `HmiMediaState` su G31 520d 2022 ha istanze `HMI_CID`/`HMI_FoMo_*`, non `1` (rimosso). Aggiungi
+   un'interfaccia solo se serve davvero a Strada/Corsa e con l'istanza verificata in
+   `/etc/oap/someip/someip-interfaces.json` dell'unità.
+8. **Crash safety**: ogni timer/evento passa dal `_guard` di `hud.js`; una seconda uscita inattesa
    disinstalla l'app sull'auto.
 
 ## 3. Fedeltà all'OEM: come misurare
