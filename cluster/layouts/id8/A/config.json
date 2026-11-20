@@ -1203,9 +1203,9 @@
     "corner": 90
   },
   "view": {
-    "_about": "The whole layout (measured on the reference photo at full panel size) scaled about (cx, cy) to fit 'visible': applied to the finished static layer and, later, to every dynamic element.",
-    "scale": 0.84,
-    "cx": 0.5,
-    "cy": 0.51667
+    "_about": "The whole layout scaled uniformly (proportions unchanged) by 'scale' about the fixed point (cx, cy), chosen so the drawing (x 66..1803, y 89..680 at the reference's size) lands centred inside 'visible'. Applied to the finished static layer and to every dynamic element.",
+    "scale": 0.835,
+    "cx": 0.56721,
+    "cy": 0.31096
   }
 }
