@@ -1390,6 +1390,104 @@ void main() {
 }
 `;
 
+// BMW's fuel and oil dials (Strada and Corsa share them, at the same place), in relief as BMW draws them: a double
+// white frame (u_bk: its outer line, from the top cap's end round the side to the foot's end; the oil dial is its
+// mirror) with small notches, a narrow channel inside it ending in a thin bright line, and past that line a wide
+// curved surface that catches the light: bright from the empty end up to the level, dark above it. The level reads by
+// height, as on BMW's: the red needle and the dividers at the half and at 0 run across nearly level. u_bkY / u_bkYR:
+// the y of full (150 C), half (100 C) and empty (50 C), which BMW does not space evenly. Fuel: below the 0 divider the
+// surface is red (reserve). Oil: blue below 50 C, the top cap red. Returns colour and coverage; q in the left frame.
+const OEM_DIAL = `
+uniform vec2 u_bk[12];     // the fuel dial's frame line (left frame), from the top cap's end to the foot's end
+uniform float u_bkC[12];   // arc length at each point
+uniform float u_bkN;       // points used (0 = no dial)
+uniform vec2 u_bkR[12];    // the oil dial's (mirrored into the left frame: BMW's is narrower and lower than the fuel one)
+uniform float u_bkCR[12];
+uniform float u_bkNR;
+uniform vec2 u_bkV;        // fuel 0..1, oil 0..1 (50..150 C)
+uniform vec3 u_bkY;        // fuel: y of full, half, empty
+uniform vec3 u_bkYR;       // oil: y of 150, 100, 50 C
+float lvlY(vec3 t, float v) { return v < 0.5 ? mix(t.z, t.y, v * 2.0) : mix(t.y, t.x, v * 2.0 - 1.0); }
+vec4 oemDial(vec2 q, float oil) {
+    bool R = oil > 0.5;
+    float n = R ? u_bkNR : u_bkN;
+    if (n < 2.0) return vec4(0.0);
+    float best = 1e6, s = 0.0, sd = 0.0, off = 0.0;
+    for (int i = 0; i < 11; i++) {
+        if (float(i) >= n - 1.0) break;
+        vec2 a = R ? u_bkR[i] : u_bk[i], ba = (R ? u_bkR[i + 1] : u_bk[i + 1]) - a;
+        float L = max(length(ba), 0.001);
+        float hr = dot(q - a, ba) / (L * L), h = clamp(hr, 0.0, 1.0);
+        vec2 d = q - (a + ba * h);
+        float dist = length(d);
+        if (dist < best) { best = dist; s = (R ? u_bkCR[i] : u_bkC[i]) + h * L; sd = (ba.y * d.x - ba.x * d.y) / L; off = abs(hr - h) * L; }
+    }
+    if (best > 130.0) return vec4(0.0);
+    float total = 0.0;
+    for (int i = 0; i < 12; i++) { if (float(i) < n) total = R ? u_bkCR[i] : u_bkC[i]; }
+    vec3 yt = oil > 0.5 ? u_bkYR : u_bkY;
+    float v = clamp(oil > 0.5 ? u_bkV.y : u_bkV.x, 0.0, 1.0);
+    float yv = lvlY(yt, v);
+    bool lit = q.y > yv;
+    float inSpan = 1.0 - smoothstep(0.0, 1.0, off);                     // the frame's lines stop at its ends
+    float inSoft = 1.0 - smoothstep(0.0, 14.0, off);                    // the surface fades out past them
+    vec3 col = vec3(0.0);
+    float a = 0.0;
+    // BMW's zones, along the foot's last stretch: fuel's reserve red, oil's cold end blue
+    float endZone = smoothstep(total - 62.0, total - 58.0, s);
+    float reserve = R ? 0.0 : endZone;
+    float cold = R ? smoothstep(total - 42.0, total - 38.0, s) : 0.0;
+    float hot = R ? 1.0 - smoothstep(44.0, 48.0, s) : 0.0;              // oil: the top cap and the side's top red
+    // the channel: 7..19 px in from the frame line, a dull tube
+    if (sd > 6.0 && sd < 20.0 && inSpan > 0.0) {
+        float u = (sd - 7.0) / 12.0;
+        float shade = 0.4 + 0.6 * sin(3.14159 * clamp(u, 0.0, 1.0));
+        vec3 ch = (lit ? vec3(0.36, 0.365, 0.38) : vec3(0.11, 0.112, 0.12)) * (0.7 + 0.5 * shade);
+        ch = mix(ch, vec3(0.62, 0.06, 0.08) * (0.7 + 0.5 * shade), reserve * 0.9);
+        ch = mix(ch, vec3(0.1, 0.32, 0.8) * (0.7 + 0.5 * shade), cold * 0.85);
+        ch = mix(ch, vec3(0.62, 0.06, 0.08) * (0.7 + 0.5 * shade), hot * 0.8);
+        float cv = clamp(sd - 6.5, 0.0, 1.0) * inSoft;
+        col = ch; a = cv;
+    }
+    // the surface past the channel's inner line: a soft curve catching the light, bright towards the empty end
+    if (sd > 19.0 && sd < 75.0 && inSoft > 0.0) {
+        float k = sd - 19.0;
+        float fall = exp(-k / 20.0) * (1.0 - smoothstep(48.0, 72.0, k));
+        float low = smoothstep(yt.x - 20.0, yt.z + 10.0, q.y);         // brighter lower down, as the light falls on it
+        vec3 sf = lit ? vec3(0.8, 0.805, 0.82) * (0.45 + 0.55 * low) : vec3(0.2, 0.205, 0.215);
+        sf = mix(sf, vec3(0.85, 0.08, 0.1), reserve * 0.6 * exp(-k / 10.0));
+        float al = fall * (lit ? 0.95 : 0.7) * inSoft;
+        col = mix(col, sf, al); a = max(a, al);
+    }
+    // the channel's thin bright inner line
+    float il = clamp(0.5 - (abs(sd - 19.0) - 0.7), 0.0, 1.0) * inSpan;
+    col = mix(col, vec3(0.9, 0.91, 0.93), il); a = max(a, il);
+    // the dividers at the half and at 0: thin lines across, nearly level, fading out over the surface
+    for (int j = 1; j < 3; j++) {
+        float yd = j == 1 ? yt.y : yt.z;
+        float dl = clamp(0.5 - (abs(q.y - yd + (sd - 4.0) * 0.12) - 0.6), 0.0, 1.0) * step(4.0, sd) * (1.0 - smoothstep(30.0, 70.0, sd)) * inSpan;
+        col = mix(col, vec3(0.85, 0.86, 0.88), dl * 0.8); a = max(a, dl * 0.8);
+    }
+    // the frame: two white lines; the oil dial's top cap red, the cold end's outer line blue, the reserve's red
+    vec3 fc = vec3(0.93, 0.94, 0.96);
+    fc = mix(fc, vec3(0.95, 0.12, 0.14), hot);
+    fc = mix(fc, vec3(0.25, 0.55, 1.0), cold);
+    float f1 = clamp(0.5 - (abs(sd) - 1.3), 0.0, 1.0) * inSpan;
+    float f2 = clamp(0.5 - (abs(sd - 4.2) - 0.8), 0.0, 1.0) * inSpan;
+    col = mix(col, vec3(0.86, 0.87, 0.9), f2); a = max(a, f2);
+    col = mix(col, fc, f1); a = max(a, f1);
+    // small notches: wedges from the frame in, at the full, half and 0 marks' height and between
+    for (int j = 0; j < 4; j++) {
+        float yn = lvlY(yt, float(j) * 0.25 + 0.125);
+        float wdg = clamp(0.5 - (abs(q.y - yn) - (2.6 - 0.45 * (sd - 4.0))), 0.0, 1.0) * step(4.0, sd) * step(sd, 8.5) * inSpan;
+        col = mix(col, vec3(0.9), wdg); a = max(a, wdg);
+    }
+    // the needle: a red bar across at the level, from the frame out past the surface, fading
+    float nd = clamp(0.5 - (abs(q.y - yv + (sd - 4.0) * 0.14) - 2.6), 0.0, 1.0) * step(3.5, sd) * (1.0 - smoothstep(22.0, 66.0, sd)) * inSoft;
+    col = mix(col, vec3(0.97, 0.12, 0.15), nd); a = max(a, nd);
+    return vec4(col, a);
+}
+`;
 const MVIEW = `// The M view theme in one cluster-render "effect" layer (GLSL ES 1.00), after the Live Cockpit's M view: black
 // everywhere (opaque), the speed scale on the left and the rev scale on the right (its mirror): a white outer line with
 // rounded corners (u_path, the left one, from its bottom end to its top end), marks inside it, the band inside the line
@@ -1420,20 +1518,19 @@ uniform float u_rpm;       // arc length of the revs now
 uniform vec4 u_ndl;        // the speed needle: from x, y to x, y (left frame)
 uniform vec4 u_ndlR;       // the rev needle (left frame, mirrored)
 uniform float u_redS;      // arc length of the redline
-uniform vec4 u_dial;       // fuel dial: centre x, y, radius (the oil dial is its mirror)
-uniform vec2 u_dialAng;    // its angle (degrees, 0 = right, 90 = down) at full and at empty
-uniform float u_fuel;      // 0..1
-uniform float u_oil;       // 0..1 (50..150 C)
 uniform vec4 u_line;       // the line under the speed: from x, to x, y; the bottom line runs on to x
 uniform vec4 u_hole;       // the map window x, y, w, h (w 0 = none)
 uniform float u_holeR;
 uniform vec4 u_panel;      // the dark panel's inner edge: its top point x, y and its point at the middle x, y
-uniform vec4 u_panelB;     // its bottom point x, y; z: how far inside the line the panel starts (0 = no panel)
+uniform vec4 u_panelB;     // its bottom point x, y; z: how far inside the line the panel starts (0 = no panel); w: its bottom y
+uniform vec4 u_panelR;     // the right panel (mirrored into the left frame; BMW's is not the left one's mirror): top, middle
+uniform vec4 u_panelRB;    // its bottom point x, y; w: its bottom y
 uniform float u_oval;      // > 0: the map window is an oval inside u_hole, feathered over this many px
 uniform float u_lineR;     // 1: the line under the speed has a mirror on the right (0: the tyre block is there)
 uniform vec4 u_tyre;       // the tyre block (right, screen px): centre x, y of the car glyph; z: 1 = shown; w: the
                            // header icon's centre x (its y is u_tyre.y - 131)
 
+${OEM_DIAL}
 const vec3 WHITE = vec3(0.92, 0.93, 0.95);
 const vec3 GREY = vec3(0.55, 0.57, 0.6);
 const vec3 PANEL = vec3(0.105, 0.11, 0.12);
@@ -1470,43 +1567,53 @@ void main() {
     float s0 = right ? u_scale.z : u_scale.x, s1 = right ? u_scale.w : u_scale.y;
     float sv = right ? u_rpm : u_speed;
 
-    // the dark panel inside the scale: from a little inside the line to the chevron edge facing the middle
+    // the dark panel inside the scale: from a little inside the line to the chevron edge facing the middle, its
+    // bottom edge straight across
+    float pmask = 0.0;
     if (u_panelB.z > 0.0 && sd > 0.0) {
-        vec2 t = u_panel.xy, m = u_panel.zw, b = u_panelB.xy;
+        vec2 t = right ? u_panelR.xy : u_panel.xy, m = right ? u_panelR.zw : u_panel.zw, b = right ? u_panelRB.xy : u_panelB.xy;
+        float yb = right ? u_panelRB.w : u_panelB.w;
         float ex, slope;
         if (q.y < m.y) { float h = (q.y - t.y) / (m.y - t.y); ex = mix(t.x, m.x, h); slope = (m.x - t.x) / (m.y - t.y); }
         else { float h = (q.y - m.y) / (b.y - m.y); ex = mix(m.x, b.x, h); slope = (b.x - m.x) / (b.y - m.y); }
         float inner = (ex - q.x) / sqrt(1.0 + slope * slope);
-        float pm = clamp(inner + 0.5, 0.0, 1.0) * smoothstep(u_panelB.z, u_panelB.z + 3.0, sd) * step(t.y, q.y);
+        // BMW's panel keeps clear of the scale: about u_panelB.z px under the top numbers, nearly twice that down the side
+        float inset = u_panelB.z * mix(1.0, 1.9, smoothstep(120.0, 260.0, q.y) * (1.0 - smoothstep(460.0, 540.0, q.y)));
+        float pm = clamp(inner + 0.5, 0.0, 1.0) * smoothstep(inset, inset + 3.0, sd) * step(t.y, q.y)
+                 * clamp(yb - q.y + 0.5, 0.0, 1.0);
+        pmask = pm;
         // a touch lighter towards the line, like BMW's
-        c = put(c, PANEL * (1.0 + 0.35 * exp(-(sd - u_panelB.z) / 90.0)), pm);
+        c = put(c, PANEL * (1.0 + 0.35 * exp(-(sd - inset) / 90.0)), pm);
+    }
+    // BMW's red glow by the needle, at any value (also at 0, parked): a cloud of red dots in the panel, round a point
+    // just past the needle's tip
+    if (pmask > 0.0) {
+        vec4 g = right ? u_ndlR : u_ndl;
+        vec2 gc = g.zw + normalize(g.zw - g.xy + vec2(0.0001)) * 45.0;
+        vec2 gq = (q - gc) / vec2(95.0, 38.0);
+        float glow = exp(-0.5 * dot(gq, gq)) * pmask;                      // a flat cloud, wide and low as BMW's
+        vec2 cell = mod(p, 6.0) - 3.0;
+        float spot = cov(length(cell) - 1.6);
+        c = put(c, RED, spot * min(1.0, glow * 1.8));
+        c = put(c, RED * 0.4, glow * 0.3);
     }
 
     if (best < 140.0) {
+        // BMW's band along the whole scale: a soft light just inside the line, closed by a thin grey line 22 px in
+        float span = smoothstep(s0 - 60.0, s0 - 20.0, s) * smoothstep(0.0, 30.0, total - s);
+        if (sd > 0.0 && sd < 24.0) c = put(c, vec3(0.78, 0.79, 0.82), 0.42 * exp(-sd / 8.0) * span);
+        c = put(c, GREY, cov(abs(sd - 22.0) - 0.7) * 0.6 * span);
         // from 0 up to the value the band inside the line is lit: grey, brightest by the line and towards the needle
         if (s >= s0 - 6.0 && s <= sv && sd > 0.0 && sd < 100.0) {
             float toward = 0.18 + 0.82 * exp(-(sv - s) / 320.0);
             float inward = pow(1.0 - sd / 100.0, 1.6);
             float lit = toward * inward * smoothstep(s0 - 6.0, s0 + 10.0, s);
-            c = put(c, vec3(0.86, 0.87, 0.9), lit * 0.8);
-            // red dots right behind the needle
-            vec2 cell = mod(p, 6.0) - 3.0;
-            float spot = cov(length(cell) - 1.4);
-            float near = exp(-(sv - s) / 55.0) * (1.0 - smoothstep(40.0, 95.0, sd));
-            c = put(c, RED, spot * near * 0.9);
-        }
-        // BMW's red glow by the needle, at any value (also at 0, parked): red dots fading along and inwards
-        if (u_panelB.z > 0.0 && sd > 0.0 && sd < 120.0 && s > s0 - 90.0) {
-            vec2 cell = mod(p, 6.0) - 3.0;
-            float spot = cov(length(cell) - 1.5);
-            float glow = exp(-abs(s - sv) / 60.0) * (1.0 - smoothstep(20.0, 120.0, sd)) * smoothstep(s0 - 90.0, s0 - 30.0, s);
-            c = put(c, RED, spot * glow * 0.85);
-            c = put(c, RED * 0.35, glow * 0.35);
+            c = put(c, vec3(0.86, 0.87, 0.9), lit * 0.55);
         }
         // the line: white, fading out at both ends, with a faint second line inside it
         float ends = smoothstep(0.0, 40.0, s) * smoothstep(0.0, 30.0, total - s);
         c = put(c, WHITE, cov(abs(sd) - 1.6) * ends);
-        c = put(c, GREY, cov(abs(sd - 7.0) - 0.8) * ends * 0.5);
+        c = put(c, GREY, cov(abs(sd - 6.0) - 0.8) * ends * 0.8);
         // the short marks between two numbers, square to the line
         vec2 tk = right ? u_ticks.zw : u_ticks.xy;
         for (int i = 0; i < 11; i++) {
@@ -1526,39 +1633,22 @@ void main() {
     for (int i = 0; i < 12; i++) {
         if (float(i) > (right ? u_ticks.z : u_ticks.x)) break;
         vec4 g = right ? u_tkR[i] : u_tk[i];
-        c = put(c, WHITE, cov(segd(q, g.xy, g.zw) - 1.5));
+        vec2 gd = g.zw - g.xy;
+        float gt = clamp(dot(q - g.xy, gd) / max(dot(gd, gd), 0.001), 0.0, 1.0);
+        c = put(c, WHITE, cov(segd(q, g.xy, g.zw) - 1.1) * (1.0 - 0.55 * gt));      // bright at the line, fading in
     }
     // the needle: a red bar from the line in towards the numbers
     {
         vec4 g = right ? u_ndlR : u_ndl;
-        c = put(c, RED, cov(segd(q, g.xy, g.zw) - 3.2));
+        vec2 gd = g.zw - g.xy;
+        float gt = clamp(dot(q - g.xy, gd) / max(dot(gd, gd), 0.001), 0.0, 1.0);
+        c = put(c, RED, cov(segd(q, g.xy, g.zw) - 2.4 + 0.8 * gt) * (1.0 - 0.45 * gt));   // tapering and fading inwards
     }
 
-    // the corner dial: fuel (left) or oil temperature (right), its value as a red mark
-    vec2 dp = q - u_dial.xy;
-    float r = length(dp);
-    float ang = degrees(atan(dp.y, dp.x));
-    float a0 = u_dialAng.x, a1 = u_dialAng.y;
-    float df = (ang - a1) / (a0 - a1);          // 0 empty / cold .. 1 full / hot
-    float arcLen = radians(abs(a0 - a1)) * u_dial.z;
-    if (df > -0.03 && df < 1.03 && abs(r - u_dial.z) < 40.0) {
-        float inArc = smoothstep(-0.02, 0.0, df) * (1.0 - smoothstep(1.0, 1.02, df));
-        vec3 rim = WHITE;
-        if (!right && df < 0.12) rim = RED;
-        if (right && df < 0.15) rim = BLUE;
-        if (right && df > 0.85) rim = RED;
-        // BMW's bracket: a dark band 26 px deep, lighter towards its outer edge, between a white line and a grey one
-        float band = smoothstep(u_dial.z - 26.0, u_dial.z - 24.5, r) * (1.0 - smoothstep(u_dial.z - 1.5, u_dial.z, r));
-        c = put(c, mix(vec3(0.07, 0.075, 0.08), vec3(0.24, 0.25, 0.27), (r - u_dial.z + 26.0) / 26.0), band * inArc);
-        c = put(c, GREY, cov(abs(r - u_dial.z + 26.0) - 0.8) * inArc);
-        c = put(c, rim, cov(abs(r - u_dial.z) - 1.5) * inArc);
-        float dv = right ? u_oil : u_fuel;
-        float mk = cov(abs(df - dv) * arcLen - 3.0) * cov(abs(r - u_dial.z + 13.0) - 13.0);
-        c = put(c, RED, mk);
-        for (int j = 0; j < 3; j++) {
-            float tf = float(j) * 0.5;
-            c = put(c, WHITE, cov(abs(df - tf) * arcLen - 1.2) * cov(abs(r - u_dial.z + 8.0) - 8.0) * 0.9);
-        }
+    // the corner dials: fuel (left) and oil temperature (right, the mirror), BMW's brackets in relief
+    {
+        vec4 dl = oemDial(q, right ? 1.0 : 0.0);
+        c = put(c, dl.rgb, dl.a);
     }
 
     // the line under the speed (left) and under the gear (right), fading in from the outer end

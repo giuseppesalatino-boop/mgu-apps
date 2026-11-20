@@ -65,11 +65,15 @@ CLUSTER_FONTS = [
     ('m_label', 'Orbitron[wght].ttf', 20, UPPER + DIGITS + ' -/%°', 0, 'Bold'),   # digits, / % °: the M readout slots' names and units
     ('m_tiny', 'Barlow-Medium.ttf', 26, LOWER + DIGITS + 'CF./ -°'),
     ('m_badge', 'Barlow-Medium.ttf', 26, UPPER + LOWER + DIGITS + ' -'),
-    # Strada / Corsa: BMW's squared numbers, narrower than Michroma (Orbitron, SIL OFL; its 0 is the plain O)
-    ('k_scale', 'Orbitron[wght].ttf', 28, DIGITS, 0, 'Bold', {'0': 'O'}),
-    ('k_speed', 'Orbitron[wght].ttf', 72, DIGITS + '-', 3, 'Black', {'0': 'O'}),
-    ('k_val', 'Orbitron[wght].ttf', 26, DIGITS + ':+-.', 0, 'Bold', {'0': 'O'}),
-    ('k_gl', 'Orbitron[wght].ttf', 22, DIGITS + '/', 0, 'Bold', {'0': 'O'}),
+    # Strada / Corsa: BMW's squared numbers. Michroma (SIL OFL) has their shapes, but is wider and lighter: thickened
+    # (stroke) and squeezed to 80 % (sx), measured against the reference photo
+    ('k_scale', 'Michroma-Regular.ttf', 29, DIGITS, 2, None, None, '', 0.76),
+    ('k_rpm', 'Michroma-Regular.ttf', 40, DIGITS, 2, None, None, '', 0.82),
+    ('k_speed', 'Michroma-Regular.ttf', 86, DIGITS + '-', 4, None, None, '', 0.8),
+    ('k_val', 'Michroma-Regular.ttf', 27, DIGITS + ':+-.', 1, None, None, '', 0.82),
+    ('k_strip', 'Michroma-Regular.ttf', 36, DIGITS + ':+-.', 2, None, None, '', 0.8),
+    ('k_gl', 'Michroma-Regular.ttf', 25, DIGITS + '/', 1, None, None, '', 0.82),
+    ('k_unit', 'BarlowSemiCondensed-SemiBold.ttf', 30, LOWER + UPPER + DIGITS + '°/-. '),
     # Sport: BMW Live Cockpit style, the wide numbers in Michroma like BMW's own
     ('s_scale', 'Michroma-Regular.ttf', 27, DIGITS, 1),
     ('s_speed', 'Michroma-Regular.ttf', 74, DIGITS + '-', 3),
@@ -118,12 +122,13 @@ PAD = 2
 ATLAS_W = 1024
 
 
-def bake(out, name, file, size, chars, stroke=0, weight=None, subs=None, tuck=''):
+def bake(out, name, file, size, chars, stroke=0, weight=None, subs=None, tuck='', sx=1.0):
     """stroke: px of extra weight round every glyph (Michroma has one weight). weight: a named instance of a
     variable font (Orbitron: Regular .. Black), for the M theme's squared BMW-style gear, speed and numbers.
     subs: {char: glyph drawn for it} (Orbitron's zero is slashed; the M8's is plain, so its O stands in).
     tuck: characters added to a font after layouts were built on its cell height (° on value / y_val, Nov 7 2026):
-    they don't count towards the cell, and one that rises above it is drawn lower so its top meets the cell's."""
+    they don't count towards the cell, and one that rises above it is drawn lower so its top meets the cell's.
+    sx: squeeze the glyphs sideways (BMW's squared numbers are narrower than any squared OFL font)."""
     font = ImageFont.truetype(os.path.join(SRC, file), size)
     if weight: font.set_variation_by_name(weight)
     subs = subs or {}
@@ -140,14 +145,16 @@ def bake(out, name, file, size, chars, stroke=0, weight=None, subs=None, tuck=''
     for c in chars:
         adv = font.getlength(glyph(c)) + (2 * stroke if c != ' ' else 0)
         if c == ' ':
-            cells.append((c, None, 0, round(adv if adv else size * 0.25)))
+            cells.append((c, None, 0, round((adv if adv else size * 0.25) * sx)))
             continue
         l, _, r, _ = boxes[c]
         w = r - l + 2 * PAD
         img = Image.new('L', (w, height), 0)
         ImageDraw.Draw(img).text((PAD - l, PAD - top + drop.get(c, 0)), glyph(c), font=font, fill=255, anchor='ls', stroke_width=stroke, stroke_fill=255)
         shift = (tab - adv) / 2 if c in DIGITS else 0
-        cells.append((c, img, round(l - PAD + shift), round(tab if c in DIGITS else adv)))
+        if sx != 1.0:
+            img = img.resize((max(1, round(img.width * sx)), height), Image.LANCZOS)
+        cells.append((c, img, round((l - PAD + shift) * sx), round((tab if c in DIGITS else adv) * sx)))
 
     # simple row packing
     x = y = 0

@@ -1684,6 +1684,38 @@ class HudApp {
     /** Where the red and orange marks start on a rev scale that ends at `max` rpm, as fractions 0..1: red from the
      *  redline, but always covering at least the last 500 rpm (the M40i's scale ends right at its 7000 redline),
      *  orange over the 700 rpm before the red. */
+    /** BMW's fuel and oil brackets (shaders.js OEM_DIAL): "bracket" is the fuel dial's frame line, target px. */
+    _bracket(c, ref, w) {
+        const pts = [], cum = [];
+        let acc = 0;
+        (w.bracket || []).slice(0, 12).forEach((p, i, a) => {
+            if (i) acc += Math.hypot(p[0] - a[i - 1][0], p[1] - a[i - 1][1]);
+            pts.push(p[0] - w.x, p[1] - w.y); cum.push(acc);
+        });
+        const n = cum.length;
+        while (pts.length < 24) pts.push(0);
+        while (cum.length < 12) cum.push(0);
+        c.uniform(ref, 'u_bk', pts, { type: 'vec2' });
+        c.uniform(ref, 'u_bkC', cum, { type: 'float' });
+        c.uniform(ref, 'u_bkN', [n]);
+        // the oil dial: its own frame (screen px), mirrored into the left frame
+        const rp = [], rc = [];
+        let racc = 0;
+        (w.bracketR || []).slice(0, 12).forEach((p, i, a) => {
+            if (i) racc += Math.hypot(p[0] - a[i - 1][0], p[1] - a[i - 1][1]);
+            rp.push(w.w - (p[0] - w.x), p[1] - w.y); rc.push(racc);
+        });
+        const rn = rc.length;
+        while (rp.length < 24) rp.push(0);
+        while (rc.length < 12) rc.push(0);
+        c.uniform(ref, 'u_bkR', rn ? rp : pts, { type: 'vec2' });
+        c.uniform(ref, 'u_bkCR', rn ? rc : cum, { type: 'float' });
+        c.uniform(ref, 'u_bkNR', [rn || n]);
+        const yt = w.bracketY || [450, 552, 602], yr = w.bracketYR || yt;
+        c.uniform(ref, 'u_bkY', yt.map((y) => y - w.y));
+        c.uniform(ref, 'u_bkYR', yr.map((y) => y - w.y));
+    }
+
     _redMarks(max) {
         const redFrom = Math.min(this.setting('redline'), max - 500) / max;
         return [redFrom, redFrom - 700 / max];
@@ -2195,14 +2227,17 @@ class HudApp {
             c.uniform(ref, 'u_redS', [mviewArc(geo, 'rpm', Math.min(this.setting('redline'), MVIEW_RPM - 500))]);
             c.uniform(ref, 'u_lineR', [w.lineRight === false ? 0 : 1]);
             c.uniform(ref, 'u_tyre', w.tyres ? [w.tyres[0] - w.x, w.tyres[1] - w.y, 1, w.tyres[2] - w.x] : [0, 0, 0, 0]);
-            c.uniform(ref, 'u_dial', [w.dial[0] - w.x, w.dial[1] - w.y, w.dial[2], 0]);
-            c.uniform(ref, 'u_dialAng', w.dialAng);
+            this._bracket(c, ref, w);
             c.uniform(ref, 'u_line', [w.line[0] - w.x, w.line[1] - w.x, w.line[2] - w.y, w.line[3] - w.x]);
             c.uniform(ref, 'u_hole', this._hole(w));
             c.uniform(ref, 'u_holeR', [this._holeRadius(w)]);
             const pn = w.panel;     // [[top x, y], [middle x, y], [bottom x, y], inset]
             c.uniform(ref, 'u_panel', pn ? [pn[0][0] - w.x, pn[0][1] - w.y, pn[1][0] - w.x, pn[1][1] - w.y] : [0, 0, 0, 1]);
-            c.uniform(ref, 'u_panelB', pn ? [pn[2][0] - w.x, pn[2][1] - w.y, pn[3], 0] : [0, 2, 0, 0]);
+            c.uniform(ref, 'u_panelB', pn ? [pn[2][0] - w.x, pn[2][1] - w.y, pn[3], (isNum(pn[4]) ? pn[4] : w.h) - w.y] : [0, 2, 0, 0]);
+            // the right panel: its own points (screen px), mirrored into the left frame; without them, the left one's mirror
+            const pr = w.panelR, mir = (pt) => [w.w - (pt[0] - w.x), pt[1] - w.y];
+            c.uniform(ref, 'u_panelR', pr ? mir(pr[0]).concat(mir(pr[1])) : (pn ? [pn[0][0] - w.x, pn[0][1] - w.y, pn[1][0] - w.x, pn[1][1] - w.y] : [0, 0, 0, 1]));
+            c.uniform(ref, 'u_panelRB', pr ? mir(pr[2]).concat([0, pr[3] - w.y]) : (pn ? [pn[2][0] - w.x, pn[2][1] - w.y, 0, (isNum(pn[4]) ? pn[4] : w.h) - w.y] : [0, 2, 0, 0]));
             c.uniform(ref, 'u_oval', [isNum(w.holeOval) ? w.holeOval : 0]);
         } else if (w.type === 'vdash') {
             // the bracket lines (target px): [x0, y0, x1, y1, width, brightness 0..1]
@@ -2821,8 +2856,7 @@ class HudApp {
             x.c.uniform(x.ref, 'u_rpm', [sR]);
             x.c.uniform(x.ref, 'u_ndl', mviewNeedle(geo, sS, len));
             x.c.uniform(x.ref, 'u_ndlR', mviewNeedle(geo, sR, len));
-            x.c.uniform(x.ref, 'u_fuel', [vals[2]]);
-            x.c.uniform(x.ref, 'u_oil', [vals[3]]);
+            x.c.uniform(x.ref, 'u_bkV', [vals[2], vals[3]]);
         } else if (w.type === 'mdash') {
             const vals = x.gauges.map(([u, G]) => {
                 const v = G.signal ? this._raw(G.signal) : null;
