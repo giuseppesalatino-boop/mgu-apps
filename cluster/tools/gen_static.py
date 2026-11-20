@@ -65,11 +65,12 @@ def expand(cfg):
         src = cfg['elements'].get(el.get('mirror_of', ''))
         if not src:
             continue
-        for key in ('outline', 'parallel', 'band', 'inner'):
+        for key in ('outline', 'parallel', 'band', 'inner', 'rail', 'track'):
             if key in src and key not in el:
                 el[key] = [[round(1 - p[0], 6)] + list(p[1:]) for p in src[key]]
-        if 'bevel' in src and 'bevel' not in el:
-            el['bevel'] = src['bevel']
+        for key in ('bevel', 'gaps', 'gap_px', 'colors'):
+            if key in src and key not in el:
+                el[key] = src[key]
         el['_side'] = 'right'
     return cfg
 
@@ -278,6 +279,26 @@ def draw_labels(img, cfg, ss=8):
         img.alpha_composite(layer, (int(round(x0 - 4 * k * kx)), int(round(y0 - 4 * k))))
 
 
+def draw_gauges(d, cfg, sc):
+    """The small slanted gauges (fuel, oil): rail and empty track, the track cut by its gaps (polygons in grid px)."""
+    W, H = cfg['grid']
+    for el in cfg['elements'].values():
+        if 'track' not in el:
+            continue
+        col = el['colors']
+        P = lambda k: [(p[0] * W, p[1] * H) for p in el[k]]
+        d.polygon(sc(P('rail')), fill=tuple(col['rail']))
+        tl, tr_, br, bl = P('track')
+        lerp = lambda a, b, t: (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+        span = bl[1] - tl[1]
+        cuts = [0.0] + sorted(el.get('gaps', [])) + [1.0]
+        g = el.get('gap_px', 0) / 2 / span
+        for i in range(len(cuts) - 1):
+            a, b = cuts[i] + (g if i else 0), cuts[i + 1] - (g if i < len(cuts) - 2 else 0)
+            # t runs from the bottom (empty, 0) to the top (full, 1)
+            d.polygon(sc([lerp(bl, tl, b), lerp(br, tr_, b), lerp(br, tr_, a), lerp(bl, tl, a)]), fill=tuple(col['track']))
+
+
 def build_static(cfg):
     """The static layer, RGBA at grid size: each bracket filled zone by zone (band, gap, stripe), then its lines and marks."""
     expand(cfg)
@@ -299,6 +320,7 @@ def build_static(cfg):
         d.line(sc(fillet_polyline(to_px(cfg, el['inner']))[1:]), fill=tuple(col['inner_line']), width=2 * SS, joint='curve')
         for x0, y0, x1, y1 in tick_rects(cfg, el):
             d.rectangle([x0 * SS, y0 * SS, x1 * SS, y1 * SS], fill=tuple(col['tick']))
+    draw_gauges(d, cfg, sc)
     img = img.resize((W, H), Image.LANCZOS)
     for el in cfg['elements'].values():
         if el.get('colors') and 'band' in el:

@@ -404,6 +404,67 @@
         ],
         "bold": 0.012
       }
+    },
+    "fuel": {
+      "_about": "The fuel gauge inside the speed bracket: a white rail and, 3 px right of it, a track in 4 equal segments (gaps at 1/4, 1/2, 3/4), both slanted like the bracket's lower leg (x = 0.5755 y + c), level ends at y 428 and 608. Measured on the photo (rail x = 0.5755 y + 83.5, 6.5 wide; track + 93.5, 15.5 wide; gaps 2.5 px). The track is empty grey here; its fill from 0 to the level is dynamic.",
+      "rail": [
+        [
+          0.17178,
+          0.59444
+        ],
+        [
+          0.17516,
+          0.59444
+        ],
+        [
+          0.22912,
+          0.84444
+        ],
+        [
+          0.22573,
+          0.84444
+        ]
+      ],
+      "track": [
+        [
+          0.17699,
+          0.59444
+        ],
+        [
+          0.18506,
+          0.59444
+        ],
+        [
+          0.23901,
+          0.84444
+        ],
+        [
+          0.23094,
+          0.84444
+        ]
+      ],
+      "gaps": [
+        0.25,
+        0.5,
+        0.75
+      ],
+      "gap_px": 2.5,
+      "colors": {
+        "rail": [
+          223,
+          223,
+          234
+        ],
+        "track": [
+          151,
+          151,
+          175
+        ]
+      }
+    },
+    "oil": {
+      "_about": "The oil temperature gauge inside the rev bracket: the fuel gauge's mirror about x 0.5; its own colours and scale come next.",
+      "mirror_of": "fuel"
     }
   }
 }
