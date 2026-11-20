@@ -319,7 +319,27 @@
             2,
             1,
             0
-          ]
+          ],
+          "6": {
+            "values": [
+              6,
+              5,
+              4,
+              3,
+              2,
+              1,
+              0
+            ],
+            "y": [
+              0.20972,
+              0.31667,
+              0.42361,
+              0.53194,
+              0.63889,
+              0.74583,
+              0.85278
+            ]
+          }
         },
         "start": 4.5,
         "length": 11.5,
@@ -337,6 +357,31 @@
           214
         ],
         "align": "left"
+      },
+      "rev_zones": {
+        "_about": "Rev zones (drawn in the dynamic layer, they follow the oil temperature). Cold (oil <= cold_c): red from cold_red. Warm (oil >= warm_c): yellow from 'yellow' to the redline, red from 'red' (set in the app within red_range). In between every edge moves linearly with the oil temperature. rpm.",
+        "petrol": {
+          "scale": "8",
+          "cold_red": 4000,
+          "yellow": 6500,
+          "red": 7000,
+          "red_range": [
+            7000,
+            7500
+          ]
+        },
+        "diesel": {
+          "scale": "6",
+          "cold_red": 3000,
+          "yellow": 4500,
+          "red": 5000,
+          "red_range": [
+            5000,
+            5000
+          ]
+        },
+        "cold_c": 40,
+        "warm_c": 90
       }
     },
     "label_rpm_unit": {

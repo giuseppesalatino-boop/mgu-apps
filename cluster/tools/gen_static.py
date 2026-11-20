@@ -103,7 +103,8 @@ def tick_rects(cfg, only=None):
         if not t or 'parallel' not in el:
             continue
         par = fillet_polyline(to_px(cfg, el['parallel']))
-        for yn in t['y']:
+        sc = t['scales'].get((el.get('numbers') or {}).get('scale', ''))
+        for yn in (sc['y'] if isinstance(sc, dict) else t['y']):
             y = yn * H
             x = x_on(par, y)
             if x is not None:
@@ -236,7 +237,9 @@ def draw_numbers(img, cfg):
         if not n:
             continue
         out = fillet_polyline(to_px(cfg, el['outline']))
-        for v, yn in zip(el['ticks']['scales'][n['scale']], el['ticks']['y']):
+        sc = el['ticks']['scales'][n['scale']]
+        vals, ys = (sc['values'], sc['y']) if isinstance(sc, dict) else (sc, el['ticks']['y'])
+        for v, yn in zip(vals, ys):
             y = yn * H
             left = n.get('align') == 'left'
             draw_number(img, str(v), x_on(out, y) + (n['gap'] if left else -n['gap']), y, n['h'], n['advance'],
