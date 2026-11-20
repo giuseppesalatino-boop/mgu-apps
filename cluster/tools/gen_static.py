@@ -587,6 +587,29 @@ def draw_gauge_labels(img, cfg):
             draw(img, ic['at'][0] * W, ic['at'][1] * H, ic['size'][0], ic['size'][1], lb['color'])
 
 
+def feet_glow(img, cfg):
+    """The blurred blue / red glow under the brackets' feet (config 'feet_glow'), added over the black."""
+    W, H = cfg['grid']
+    for el in cfg['elements'].values():
+        if 'y_peak' not in el:
+            continue
+        yt, yp, ye = el['y_top'] * H, el['y_peak'] * H, el['y_end'] * H
+        X, Y = np.meshgrid(np.arange(W) + 0.5, np.arange(int(yt) - 1, int(ye) + 2) + 0.5)
+        vy = np.where(Y < yp, smooth(yt, yp, Y), 1 - smooth(yp, ye, Y) ** 0.7)
+        f = (Y - yt) / (ye - yt)
+        xo = (el['x_out'] + (el['x_out_bottom'] - el['x_out']) * f) * W
+        vx = smooth(xo - 3, xo + 3, X) * (1 - smooth(el['x_full'] * W, el['x_fade'] * W, X))
+        left = (vx * vy)[..., None] * np.array(el['blue'], np.float32)
+        vxr = vx[:, ::-1]                                        # the red one: the mirror
+        right = (vxr * vy)[..., None] * np.array(el['red'], np.float32)
+        arr = np.asarray(img).astype(np.float32)
+        y0 = int(yt) - 1
+        sl = arr[y0:y0 + Y.shape[0], :, :3]
+        arr[y0:y0 + Y.shape[0], :, :3] = np.clip(sl + left + right, 0, 255)
+        img = Image.fromarray(arr.astype(np.uint8), 'RGBA')
+    return img
+
+
 def build_static(cfg):
     """The static layer, RGBA at grid size: each bracket filled zone by zone (band, gap, stripe), then its lines and marks."""
     expand(cfg)
@@ -622,6 +645,7 @@ def build_static(cfg):
             img = bevel(img, cfg, el)
     for el in cfg['elements'].values():
         img = gauge_bevel(img, cfg, el)
+    img = feet_glow(img, cfg)
     draw_numbers(img, cfg)
     draw_labels(img, cfg)
     draw_gauge_labels(img, cfg)

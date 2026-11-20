@@ -1166,6 +1166,26 @@
         ],
         "edge": 0.78
       }
+    },
+    "feet_glow": {
+      "_about": "The blurred glow under each bracket's foot (blue under the speed one, red under the rev one, its mirror): a band from y_top, brightest at y_peak, gone by y_end; full from its outer edge (slanted, x_out at the top -> x_out_bottom) to x_full, fading out by x_fade. Measured on the photo's pixel columns (x 400, 480, 560, 700; 1450, 1550).",
+      "y_top": 0.89028,
+      "y_peak": 0.9,
+      "y_end": 0.94444,
+      "x_out": 0.18125,
+      "x_out_bottom": 0.1776,
+      "x_full": 0.22917,
+      "x_fade": 0.44792,
+      "blue": [
+        6,
+        108,
+        235
+      ],
+      "red": [
+        229,
+        44,
+        60
+      ]
     }
   },
   "engine": "petrol",
