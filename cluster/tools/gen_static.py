@@ -879,6 +879,12 @@ def draw_zone(img, cfg, el, y_from, y_to, colour, off=5.5, width=4.2):
     across = np.clip(width / 2 + 0.5 - np.abs(dp - off), 0, 1)
     along = np.clip(np.minimum(Y - ya, yb - Y) / 2 + 0.5, 0, 1)            # soft, rounded-looking ends
     core = across * along * (G > 0.5)
+    # the line never touches a mark: it stops 'clear' px before every one and goes on past it
+    clear = 3.0
+    for tx0, ty0, tx1, ty1 in tick_rects(cfg, el):
+        dx = np.maximum(np.maximum(tx0 - X, X - tx1), 0)
+        dy = np.maximum(np.maximum(ty0 - Y, Y - ty1), 0)
+        core = core * np.clip((np.hypot(dx, dy) - clear) / 1.2, 0, 1)
     glow = np.asarray(Image.fromarray((core * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2.5))) / 255.0
     arr = np.asarray(img).astype(np.float32)
     sub = arr[y0:y1, x0:x1, :3]
