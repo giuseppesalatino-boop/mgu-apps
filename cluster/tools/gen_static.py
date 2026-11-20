@@ -887,7 +887,7 @@ def draw_zone(img, cfg, el, y_from, y_to, colour, off=5.5, width=4.2, cuts=()):
         core = core * np.clip((np.hypot(dx, dy) - clear) / 1.2, 0, 1)
     # LED-like dashes of 500 rpm: cut at every half-thousand ('cuts', the heights), as wide as the gap round a mark
     for yc in cuts:
-        core = core * np.clip((np.abs(Y - yc) - 4.5) / 1.2, 0, 1)
+        core = core * np.clip((np.abs(Y - yc) - 0.9) / 0.8, 0, 1)        # a hairline cut, just enough to read as LEDs
     glow = np.asarray(Image.fromarray((core * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2.5))) / 255.0
     arr = np.asarray(img).astype(np.float32)
     sub = arr[y0:y1, x0:x1, :3]
