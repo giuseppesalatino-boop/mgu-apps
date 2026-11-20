@@ -400,7 +400,15 @@ def draw_panel(img, cfg):
             ys, cs = [r[0] for r in stops], np.array([r[1] for r in stops], np.float32)
             yy = (np.arange(img.size[1]) + 0.5) / SS
             grad = np.stack([np.interp(yy, ys, cs[:, k]) for k in range(3)], -1)
-            arr = np.repeat(grad[:, None, :], img.size[0], axis=1).astype(np.uint8)
+            soft = col.get('soften', 0) * SS                  # no hard steps: the profile smoothed over 'soften' px
+            if soft > 0:
+                k = np.exp(-0.5 * (np.arange(-3 * soft, 3 * soft + 1) / soft) ** 2)
+                k /= k.sum()
+                pad = len(k) // 2
+                grad = np.stack([np.convolve(np.pad(grad[:, c], pad, mode='edge'), k, 'valid') for c in range(3)], -1)
+            arr = np.repeat(grad[:, None, :], img.size[0], axis=1)
+            arr = arr + np.random.default_rng(7).uniform(-0.5, 0.5, arr.shape)   # a touch of dither: no banding
+            arr = np.clip(arr + 0.5, 0, 255).astype(np.uint8)
             fill = Image.fromarray(np.dstack([arr, np.full(arr.shape[:2], 255, np.uint8)]), 'RGBA')
         img.paste(fill, (0, 0), m)
     # the thin light lines, added over the blue, only inside the panel and its wings

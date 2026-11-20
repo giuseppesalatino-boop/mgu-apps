@@ -892,7 +892,7 @@
       ],
       "_about_gear": "The one part that is not symmetric: the gear cut-out's inner side slants the same way as the speed cut-out's (x = -0.615 y + 1538, from (1355, 298) down to (1299, 388)), not as its mirror. 'gear_cut' replaces the two mirrored vertices.",
       "colors": {
-        "_about": "The panel's fill by height: [y px, RGB] stops sampled on the photo's sides (x 560-760 and 1160-1360, row medians), linear between them; a lighter top band, darker middle, lighter lower part. The wings are flat.",
+        "_about": "The panel's fill by height: [y px, RGB] stops sampled on the photo's sides (x 560-760 and 1160-1360, row medians), linear between them; a lighter top band, darker middle, lighter lower part. The wings are flat. 'soften': the profile is smoothed over that many px, so the light top and the darker middle melt into each other with no straight edge.",
         "rows": [
           [
             160,
@@ -1000,7 +1000,8 @@
               116
             ]
           ]
-        ]
+        ],
+        "soften": 26
       },
       "top_right": [
         [
