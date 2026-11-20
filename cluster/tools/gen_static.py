@@ -366,50 +366,53 @@ def draw_pump(img, x, y, w, h, color, ss=8):
     img.alpha_composite(layer, (int(round(x)) - 2, int(round(y)) - 2))
 
 
-def draw_oil(img, x, y, w, h, color, ss=8):
-    """The ISO 2575 engine oil temperature symbol (an oil can with a thermometer, a drop from the spout), in BMW's
-    style, traced on the photo's 48 x 32 px icon."""
-    k = (w / 48.0, h / 32.0)
+def _icon_canvas(w, h, ss):
     m = Image.new('L', (int(w + 4) * ss, int(h + 4) * ss), 0)
-    d = ImageDraw.Draw(m)
+    k = (w / 48.0, h / 32.0)
     P = lambda px_, py: ((2 + px_ * k[0]) * ss, (2 + py * k[1]) * ss)
-    lw = int(round(2.6 * ss))
-    lt = int(round(2.2 * ss))
-    d.rounded_rectangle([P(23.5, -3), P(26.5, 16)], radius=1.5 * ss, fill=255)            # the thermometer
-    d.ellipse([P(22, 13.5), P(28, 19.5)], fill=255)                                        # its bulb
-    for ty in (0, 4, 8):
-        d.line([P(27.5, ty), P(30.5, ty)], fill=255, width=lt)                             # its scale
-    for ly in (8.5, 12):
-        d.line([P(11, ly), P(20.5, ly)], fill=255, width=lt)                               # the oil level lines
-    d.line([P(2, 9), P(5.5, 7.5), P(8.5, 10.5), P(5, 13.5), P(1, 12), P(2, 9)], fill=255, width=lw, joint='curve')  # handle
-    d.line([P(6, 13), P(10, 21.5), P(11, 24), P(30, 24), P(35.5, 16), P(38, 11.5), P(41.5, 10.5)], fill=255,
-           width=lw, joint='curve')                                                        # the can and its spout
-    d.ellipse([P(39.5, 17), P(43.5, 21.5)], fill=255)                                      # the drop
+    return m, ImageDraw.Draw(m), P
+
+
+def _icon_paste(img, m, x, y, w, h, color):
     m = m.resize((int(w + 4), int(h + 4)), Image.LANCZOS)
     layer = Image.new('RGBA', m.size, tuple(color) + (0,))
     layer.putalpha(m)
     img.alpha_composite(layer, (int(round(x)) - 2, int(round(y)) - 2))
+
+
+def _thermometer(d, P, ss, cx, top, bulb_y, lw):
+    """ISO 2575's thermometer: a stem, a round bulb, three marks on its right (long, short, long)."""
+    d.line([P(cx, top), P(cx, bulb_y)], fill=255, width=int(round(2.8 * ss)))
+    d.ellipse([P(cx - 3.2, bulb_y - 3.2), P(cx + 3.2, bulb_y + 3.2)], fill=255)
+    for ty, ln in ((top + 1, 4.5), (top + 4.5, 3), (top + 8, 4.5)):
+        d.line([P(cx + 2.5, ty), P(cx + 2.5 + ln, ty)], fill=255, width=lw)
+
+
+def draw_oil(img, x, y, w, h, color, ss=8):
+    """ISO 7000-0247, engine oil temperature: an oil can (handle, body, spout, a drop) with a thermometer standing in
+    it, in the theme's line weight; w x h px box (48 x 32 on the photo)."""
+    m, d, P = _icon_canvas(w, h, ss)
+    lw = int(round(2.6 * ss))
+    _thermometer(d, P, ss, 22, -3, 18, int(round(2 * ss)))
+    d.line([P(9, 14), P(19, 14)], fill=255, width=lw)                                      # the can's top, left of it
+    d.line([P(25, 14), P(34, 14)], fill=255, width=lw)                                     # ... and right of it
+    d.line([P(9, 14), P(13, 25.5), P(31.5, 25.5), P(34, 14)], fill=255, width=lw, joint='curve')     # the body
+    d.line([P(9, 14), P(4, 10.5), P(1, 13), P(4.5, 17.5), P(10.5, 18)], fill=255, width=lw, joint='curve')   # the handle loop
+    d.line([P(33.5, 16.5), P(43.5, 10)], fill=255, width=lw)                                # the spout
+    d.ellipse([P(41.5, 14.5), P(45.5, 19.5)], fill=255)                                     # the drop
+    _icon_paste(img, m, x, y, w, h, color)
 
 
 def draw_coolant(img, x, y, w, h, color, ss=8):
-    """The ISO 2575 engine coolant temperature symbol (a thermometer standing in two waves), in the oil icon's style
-    and box."""
-    k = (w / 48.0, h / 32.0)
-    m = Image.new('L', (int(w + 4) * ss, int(h + 4) * ss), 0)
-    d = ImageDraw.Draw(m)
-    P = lambda px_, py: ((2 + px_ * k[0]) * ss, (2 + py * k[1]) * ss)
-    lw, lt = int(round(2.6 * ss)), int(round(2.2 * ss))
-    d.rounded_rectangle([P(22.5, -3), P(25.5, 13)], radius=1.5 * ss, fill=255)            # the thermometer
-    d.ellipse([P(21, 10.5), P(27, 16.5)], fill=255)                                        # its bulb
-    for ty in (-1, 3, 7):
-        d.line([P(26.5, ty), P(30, ty)], fill=255, width=lt)                               # its scale
-    for wy in (20.5, 26):                                                                  # the two waves
-        pts = [P(6 + i * 1.5, wy + 1.6 * math.sin(i * 1.5 / 36 * 4 * math.pi)) for i in range(25)]
+    """ISO 7000-0246, engine coolant temperature: a thermometer whose bulb stands on two waves, in the theme's line
+    weight; same box as the oil icon."""
+    m, d, P = _icon_canvas(w, h, ss)
+    lw = int(round(2.6 * ss))
+    _thermometer(d, P, ss, 24, -3, 15, int(round(2 * ss)))
+    for wy in (22, 28):                                                                     # two waves, 2 periods
+        pts = [P(6 + i * 1.5, wy + 1.8 * math.sin(i * 1.5 / 36 * 4 * math.pi)) for i in range(25)]
         d.line(pts, fill=255, width=lw, joint='curve')
-    m = m.resize((int(w + 4), int(h + 4)), Image.LANCZOS)
-    layer = Image.new('RGBA', m.size, tuple(color) + (0,))
-    layer.putalpha(m)
-    img.alpha_composite(layer, (int(round(x)) - 2, int(round(y)) - 2))
+    _icon_paste(img, m, x, y, w, h, color)
 
 
 def draw_gauge_labels(img, cfg):
