@@ -1148,17 +1148,17 @@
       }
     },
     "bottom_bar": {
-      "_about": "The grey bar under the frame: x 517-1403 (symmetric), y 621-631, ends cut slanted like the frame's lower sides, lighter along its middle (a slight tube).",
+      "_about": "The grey bar under the frame, on the same line as the brackets' feet (y 625-635, their inner and outer profiles), x 517-1403 (symmetric), its ends cut slanted like the feet's, lighter along its middle.",
       "bar": {
         "x": [
           0.26927,
           0.73073
         ],
         "y": [
-          0.8625,
-          0.87639
+          0.86806,
+          0.88194
         ],
-        "slant": 6,
+        "slant": 3,
         "color": [
           187,
           188,
