@@ -754,7 +754,12 @@ def compare(cfg, static, ref_path, out_path):
 # ---------------------------------------------------------------------------------------------------------------------
 # the dynamic layer, previewed: what the car draws 30 times a second over the static layer (sampled with a telemetry)
 # ---------------------------------------------------------------------------------------------------------------------
-FILL = {'blue': ((10, 212, 250), (2, 158, 246)), 'red': ((236, 48, 70), (190, 18, 40))}   # top / bottom of a fill
+# a fill's colours, top (by the value) / bottom (by the 0), sampled on the reference photo below its 57 km/h: the band and
+# the gap, the outer stripe (a little lighter), and the glow the stripe takes on over 'glow_px' above the value
+FILL = {'blue': {'band': ((8, 212, 250), (1, 150, 248)), 'stripe': ((62, 235, 255), (22, 134, 230)),
+                 'glow': (34, 242, 246), 'glow_px': 100},
+        'red': {'band': ((236, 48, 70), (190, 18, 40)), 'stripe': ((250, 92, 112), (205, 30, 52)),
+                'glow': (255, 96, 116), 'glow_px': 100}}
 ZONE = {'yellow': (255, 196, 0), 'red': (235, 30, 40)}
 
 
@@ -774,21 +779,29 @@ def _mask(size, poly):
 
 
 def draw_bracket_value(img, cfg, el, y_v, colour):
-    """A bracket lit from its 0 up to y_v (a fill darker downwards), the white bar across it at the value, a dark
-    hairline under the bar; as on the reference photo (bar 6 px, 2 px gap)."""
+    """A bracket lit from its 0 up to y_v, as on the reference photo: the band and gap in one colour and the outer
+    stripe a little lighter, both darker towards the 0 (the marks under the fill disappear); the white bar across the
+    bracket at the value (6 px) with a dark 2 px hairline under it; above the value the outer stripe glows, fading out
+    over glow_px."""
     W, H = cfg['grid']
-    whole = bracket_zones(cfg, el)[0]
-    m = _mask((W, H), whole)
+    F = FILL[colour]
+    whole, _, to_par = bracket_zones(cfg, el)
+    m, ms = _mask((W, H), whole), _mask((W, H), to_par)
     Y = np.arange(H, dtype=np.float32)[:, None] + 0.5
-    top, bot = np.array(FILL[colour][0], np.float32), np.array(FILL[colour][1], np.float32)
-    t = np.clip((Y - y_v) / max(640 - y_v, 1), 0, 1)
-    col = top + (bot - top) * t[..., None]
-    lit = m * np.clip(Y - (y_v + 7), 0, 1)
-    bar = m * np.clip(1 - np.abs(Y - (y_v + 0.5)) / 3.2, 0, 1) ** 0.3 * (np.abs(Y - (y_v + 0.5)) < 3.6)
+    t = np.clip((Y - y_v) / max(640 - y_v, 1), 0, 1)[..., None]
+    grad = lambda pair: np.array(pair[0], np.float32) + (np.array(pair[1], np.float32) - np.array(pair[0], np.float32)) * t
+    col_band, col_stripe = grad(F['band']), grad(F['stripe'])
+    below = np.clip(Y - (y_v + 7), 0, 1)
+    bar = (np.abs(Y - (y_v + 0.5)) < 3.0).astype(np.float32) + 0.5 * (np.abs(np.abs(Y - (y_v + 0.5)) - 3.25) < 0.5)
+    glow = np.clip(1 - (y_v - Y) / F['glow_px'], 0, 1) ** 1.4 * (Y < y_v - 3)
     arr = np.asarray(img).astype(np.float32)
     rgb = arr[..., :3]
-    rgb = rgb + (np.broadcast_to(col, rgb.shape) - rgb) * lit[..., None]
-    rgb = rgb + (np.array([250, 252, 255], np.float32) - rgb) * bar[..., None]
+    lit_band = (m * below)[..., None]
+    lit_stripe = (ms * below)[..., None]
+    rgb = rgb + (np.broadcast_to(col_band, rgb.shape) - rgb) * lit_band
+    rgb = rgb + (np.broadcast_to(col_stripe, rgb.shape) - rgb) * lit_stripe
+    rgb = rgb + (np.array(F['glow'], np.float32) - rgb) * (ms * glow)[..., None]
+    rgb = rgb + (np.array([250, 252, 255], np.float32) - rgb) * np.clip(m * bar, 0, 1)[..., None]
     arr[..., :3] = rgb
     return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), 'RGBA')
 
@@ -844,10 +857,6 @@ def draw_dynamic(img, cfg, tel):
     # the fills
     img = draw_bracket_value(img, cfg, L, value_y(L, L['numbers']['scale'], tel['speed']), 'blue')
     img = draw_bracket_value(img, cfg, R, value_y(R, rz['scale'], tel['rpm'] / 1000), 'red')
-    for el in (L, R):                                          # the marks stay on top
-        d = ImageDraw.Draw(img)
-        for x0, y0, x1, y1 in tick_rects(cfg, el):
-            d.rectangle([x0, y0, x1, y1], fill=tuple(el['colors']['tick']))
     # the gauges
     img = draw_gauge_level(img, cfg, E['fuel'], tel['fuel'])
     rng = (50, 130) if eng == 'diesel' else (50, 150)
@@ -877,6 +886,8 @@ def main():
             k, v = kv.split('=')
             sim[k] = v if k in ('gear', 'engine') else float(v)
         cfg['engine'] = sim.get('engine', cfg.get('engine', 'petrol'))
+        if 'scale' in sim:                                     # the speed scale (260, 330, 160mph, 200mph)
+            cfg['elements']['bracket_left']['numbers']['scale'] = '%g' % sim['scale'] if isinstance(sim['scale'], float) else sim['scale']
         for k in ('speed', 'gear'):                            # the live values replace the photo's samples
             cfg['elements'][k]['sample'] = ''
         live = fit_view(draw_dynamic(build_static(cfg), cfg, sim), cfg)
