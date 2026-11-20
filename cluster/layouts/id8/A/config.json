@@ -873,7 +873,7 @@
       "_about_gear": "The one part that is not symmetric: the gear cut-out's inner side slants the same way as the speed cut-out's (x = -0.615 y + 1538, from (1355, 298) down to (1299, 388)), not as its mirror. 'gear_cut' replaces the two mirrored vertices."
     },
     "speed": {
-      "_about": "The speed in the speed cut-out: BMW's big squared digits (tools/gen_static.py big_glyph: 76 x 59 px, bars 10, uprights 22, measured on the photo's 57), right edge at x 540, top at y 315, 10 px apart; three digits are scaled down to fit the cut-out (from 'min_left'). Dynamic: drawn by the live layer, sampled here with the photo's value.",
+      "_about": "The speed in the speed cut-out: BMW's big squared digits (tools/gen_static.py big_glyph: 76 x 59 px, bars 10, uprights 22, measured on the photo's 57), right edge at x 540, top at y 315, 10 px apart; always full size: three digits grow to the left over the cut-out's slanted side. Dynamic: drawn by the live layer, sampled here with the photo's value.",
       "digits": {
         "right": 0.28125,
         "top": 0.4375,
@@ -882,7 +882,6 @@
         "bar": 10,
         "upright": 22,
         "gap": 10,
-        "min_left": 0.19062,
         "color": [
           248,
           249,
