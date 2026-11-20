@@ -9,7 +9,7 @@
       "_about": "The blue speed bracket's outer profile, from the end of its top line round the apex, then straight along y 635 past the 0 to where the light band ends at x 510 (the darker band and glow below are the shadow, drawn later). Legs fitted on the photo's pixels (max error 1.1 px): upper x = -0.5911 y + 346.31, lower x = 0.5755 y - 25.78; the right bracket is its mirror about x 0.5 (checked later on the red one).",
       "outline": [
         [
-          0.34115,
+          0.34635,
           0.16389,
           0
         ],
@@ -36,7 +36,12 @@
       ],
       "inner": [
         [
-          0.34115,
+          0.34635,
+          0.16389,
+          0
+        ],
+        [
+          0.34635,
           0.17222,
           0
         ],
@@ -66,7 +71,7 @@
           0
         ]
       ],
-      "_about_inner": "The bracket's inner profile: parallel to the outer one (upper x = -0.594 y + 447.9, lower x = 0.581 y + 42.2), the band wider above the apex (~100 px across) than below it (~71 px); at the top it runs level 4.5 px under the top line to its end (x 655); at the bottom it runs level at y 625 to x 510 and the slanted end cut (510,625)-(507,635) closes the 10 px foot."
+      "_about_inner": "The bracket's inner profile: parallel to the outer one (upper x = -0.594 y + 447.9, lower x = 0.581 y + 42.2), the band wider above the apex (~100 px across) than below it (~71 px); at the top it runs level 4.5 px under the top line to its end (x 665), where a short upright closes the two; at the bottom it runs level at y 625 to x 510 and the slanted end cut (510,625)-(507,635) closes the 10 px foot."
     }
   }
 }
