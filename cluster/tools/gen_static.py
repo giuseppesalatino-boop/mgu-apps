@@ -862,7 +862,7 @@ def _value_bar(img, cfg, el, y_v, ss=6):
     return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), 'RGBA')
 
 
-def draw_zone(img, cfg, el, y_from, y_to, colour, off=5.5, width=4.2):
+def draw_zone(img, cfg, el, y_from, y_to, colour, off=5.5, width=4.2, cuts=()):
     """A rev zone as on the reference photo: a thin lit line in the dark gap, parallel to the bracket, 'off' px in
     from the parallel, from the zone's start to its end, with rounded ends and a soft glow round it."""
     W, H = cfg['grid']
@@ -885,6 +885,9 @@ def draw_zone(img, cfg, el, y_from, y_to, colour, off=5.5, width=4.2):
         dx = np.maximum(np.maximum(tx0 - X, X - tx1), 0)
         dy = np.maximum(np.maximum(ty0 - Y, Y - ty1), 0)
         core = core * np.clip((np.hypot(dx, dy) - clear) / 1.2, 0, 1)
+    # LED-like dashes of 500 rpm: cut at every half-thousand ('cuts', the heights), as wide as the gap round a mark
+    for yc in cuts:
+        core = core * np.clip((np.abs(Y - yc) - 4.5) / 1.2, 0, 1)
     glow = np.asarray(Image.fromarray((core * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2.5))) / 255.0
     arr = np.asarray(img).astype(np.float32)
     sub = arr[y0:y1, x0:x1, :3]
@@ -931,7 +934,9 @@ def draw_dynamic(img, cfg, tel):
     top = max(R['ticks']['scales'][rz['scale']]['values'] if isinstance(R['ticks']['scales'][rz['scale']], dict)
               else R['ticks']['scales'][rz['scale']]) * 1000
     for colour, a, b in zones:
-        img = draw_zone(img, cfg, R, value_y(R, rz['scale'], a / 1000), value_y(R, rz['scale'], (b or top) / 1000), colour)
+        b = b or top
+        cuts = [value_y(R, rz['scale'], r / 1000) for r in range(int(a) + 500, int(b), 1000) if r % 1000 == 500]
+        img = draw_zone(img, cfg, R, value_y(R, rz['scale'], a / 1000), value_y(R, rz['scale'], b / 1000), colour, cuts=cuts)
     # the fills
     img = draw_bracket_value(img, cfg, L, value_y(L, L['numbers']['scale'], tel['speed']), 'blue')
     img = draw_bracket_value(img, cfg, R, value_y(R, rz['scale'], tel['rpm'] / 1000), 'red')
