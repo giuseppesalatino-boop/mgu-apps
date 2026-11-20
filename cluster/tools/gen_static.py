@@ -273,12 +273,12 @@ def draw_labels(img, cfg, ss=8):
         x0, y0, x1, y1 = lb['box'][0] * W, lb['box'][1] * H, lb['box'][2] * W, lb['box'][3] * H
         font = ImageFont.truetype(os.path.join(FONTS, lb['font']), 200)
         sw = int(round(200 * lb.get('bold', 0)))                # extra weight, as a fraction of the font size
-        l, t, r, b = font.getbbox(lb['text'], stroke_width=sw)  # the photo's text sets the scale
+        l, t, r, b = font.getbbox(lb.get('fit_text', lb['text']), stroke_width=sw)  # the photo's text sets the scale
         k = (y1 - y0) / (b - t)
         l2, t2, r2, b2 = font.getbbox(text, stroke_width=sw)
         m = Image.new('L', (r2 - l2 + 8, max(b, b2) - t + 8), 0)      # room for descenders (the p of mph)
         ImageDraw.Draw(m).text((4 - l2, 4 - t), text, font=font, fill=255, stroke_width=sw, stroke_fill=255)
-        if text != lb['text']:
+        if text != lb.get('fit_text', lb['text']) and lb.get('lift_mph'):
             y0 -= lb.get('lift_mph', 0)                              # raised so the descender clears the line below
         m = m.resize((max(1, round(m.width * k)), max(1, round(m.height * k))), Image.LANCZOS)
         kx = 1.0
@@ -423,10 +423,13 @@ def draw_gauge_labels(img, cfg):
             continue
         if 'variants' in lb:                                      # picked by the engine (petrol / diesel)
             lb = dict(lb, **lb['variants'][cfg.get('engine', 'petrol')])
-        for it in lb['items']:
+        imperial = cfg.get('units') == 'imperial'
+        for it in (lb.get('items_imperial') if imperial and lb.get('items_imperial') else lb['items']):
             draw_number(img, it['text'], it['at'][0] * W, it['at'][1] * H, it['h'], 32.5, lb['color'],
                         align=it.get('align', 'left'), sx=lb.get('sx', 1.0), gap=lb.get('gap'))
         for tx in lb.get('text', []):
+            if imperial and tx.get('text_imperial'):
+                tx = dict(tx, text=tx['text_imperial'], fit_text=tx['text'])
             draw_labels(img, {'grid': cfg['grid'], 'elements': {'t': {'label': tx}}})
         ic = lb.get('icon')
         if ic:

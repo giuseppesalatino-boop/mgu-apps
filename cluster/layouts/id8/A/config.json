@@ -602,7 +602,8 @@
               215,
               221
             ],
-            "bold": 0.012
+            "bold": 0.012,
+            "text_imperial": "\u00b0F"
           }
         ],
         "variants": {
@@ -650,6 +651,39 @@
             "range_c": [
               50,
               150
+            ],
+            "items_imperial": [
+              {
+                "text": "300",
+                "at": [
+                  0.8,
+                  0.60694
+                ],
+                "h": 21,
+                "align": "right"
+              },
+              {
+                "text": "210",
+                "at": [
+                  0.77396,
+                  0.71736
+                ],
+                "h": 22,
+                "align": "right"
+              },
+              {
+                "text": "120",
+                "at": [
+                  0.75104,
+                  0.825
+                ],
+                "h": 22,
+                "align": "right"
+              }
+            ],
+            "range_f": [
+              120,
+              300
             ]
           },
           "diesel": {
@@ -696,12 +730,45 @@
             "range_c": [
               50,
               130
+            ],
+            "items_imperial": [
+              {
+                "text": "260",
+                "at": [
+                  0.8,
+                  0.60694
+                ],
+                "h": 21,
+                "align": "right"
+              },
+              {
+                "text": "190",
+                "at": [
+                  0.77396,
+                  0.71736
+                ],
+                "h": 22,
+                "align": "right"
+              },
+              {
+                "text": "120",
+                "at": [
+                  0.75104,
+                  0.825
+                ],
+                "h": 22,
+                "align": "right"
+              }
+            ],
+            "range_f": [
+              120,
+              260
             ]
           }
         }
       },
       "warn": {
-        "_about": "The track's fill colour follows the temperature (dynamic layer), like the rev zones: blue (the speed bracket's stripe colour) up to cold_c, meaning a cold engine, then the normal fill. Red from hot_c (oil 140, coolant 120).",
+        "_about": "The track's fill colour follows the temperature (dynamic layer), like the rev zones: blue (the speed bracket's stripe colour) up to cold_c, meaning a cold engine, then the normal fill. Red from hot_c (oil 140, coolant 120). Imperial: the same temperatures in F (cold 149, hot 284 / 248).",
         "cold_c": 65,
         "cold_color": [
           14,
@@ -716,10 +783,17 @@
           235,
           30,
           40
-        ]
+        ],
+        "cold_f": 149,
+        "hot_f": {
+          "petrol": 284,
+          "diesel": 248
+        }
       }
     }
   },
   "engine": "petrol",
-  "_about_engine": "'engine' (set by the app): petrol or diesel. It picks the rev scale (8 or 6, rev_zones) and the right gauge: oil 50-150 C (petrol) or coolant 50-130 C with its middle mark at 90 (diesel), each with its own icon."
+  "_about_engine": "'engine' (set by the app): petrol or diesel. It picks the rev scale (8 or 6, rev_zones) and the right gauge: oil 50-150 C (petrol) or coolant 50-130 C with its middle mark at 90 (diesel), each with its own icon.",
+  "units": "metric",
+  "_about_units": "'units' (set by the app, the same setting as km/h / mph): metric or imperial. Imperial: mph scales, the right gauge in F (oil 120-210-300, coolant 120-190-260, label F), torque in lb-ft."
 }
