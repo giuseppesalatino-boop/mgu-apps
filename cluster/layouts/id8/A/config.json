@@ -29,20 +29,20 @@
           8
         ],
         [
-          0.26562,
+          0.26406,
           0.88194,
           0
         ]
       ],
       "inner": [
         [
-          0.20833,
-          0.16597,
+          0.34115,
+          0.17222,
           0
         ],
         [
-          0.1963,
-          0.16597,
+          0.19492,
+          0.17222,
           10
         ],
         [
@@ -59,9 +59,14 @@
           0.26562,
           0.86806,
           0
+        ],
+        [
+          0.26406,
+          0.88194,
+          0
         ]
       ],
-      "_about_inner": "The bracket's inner profile (the thin light line that closes its blue band): parallel to the outer one (upper x = -0.594 y + 447.9, lower x = 0.581 y + 42.2) but the band is wider above the apex (~100 px across) than below it (~71 px); it merges into the top line at x ~377 and turns level at y 625 to x 510, so the foot is a 10 px strip (625..635)."
+      "_about_inner": "The bracket's inner profile: parallel to the outer one (upper x = -0.594 y + 447.9, lower x = 0.581 y + 42.2), the band wider above the apex (~100 px across) than below it (~71 px); at the top it runs level 4.5 px under the top line to its end (x 655); at the bottom it runs level at y 625 to x 510 and the slanted end cut (510,625)-(507,635) closes the 10 px foot."
     }
   }
 }
