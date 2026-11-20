@@ -758,9 +758,9 @@ def compare(cfg, static, ref_path, out_path):
 # the gap, the outer stripe (a little lighter), and the glow the stripe takes on over 'glow_px' above the value
 FILL = {'blue': {'band': ((8, 212, 250), (1, 150, 248)), 'stripe': ((62, 235, 255), (22, 134, 230)),
                  'glow': (34, 242, 246), 'glow_px': 100},
-        'red': {'band': ((236, 48, 70), (190, 18, 40)), 'stripe': ((250, 92, 112), (205, 30, 52)),
-                'glow': (255, 96, 116), 'glow_px': 100}}
-ZONE = {'yellow': (255, 196, 0), 'red': (235, 30, 40)}
+        'red': {'band': ((252, 42, 80), (252, 28, 66)), 'stripe': ((228, 30, 66), (244, 34, 62)),
+                'glow': (226, 112, 136), 'glow_px': 100}}
+ZONE = {'yellow': (255, 190, 20), 'red': (240, 40, 70)}     # the zone lines' colour (their core burns lighter)
 
 
 def value_y(el, scale, v):
@@ -862,15 +862,31 @@ def _value_bar(img, cfg, el, y_v, ss=6):
     return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), 'RGBA')
 
 
-def draw_zone(img, cfg, el, y_from, y_to, colour):
-    """A rev zone: the bracket's outer stripe coloured between two heights."""
+def draw_zone(img, cfg, el, y_from, y_to, colour, off=5.5, width=4.2):
+    """A rev zone as on the reference photo: a thin lit line in the dark gap, parallel to the bracket, 'off' px in
+    from the parallel, from the zone's start to its end, with rounded ends and a soft glow round it."""
     W, H = cfg['grid']
-    m = _mask((W, H), bracket_zones(cfg, el)[2])
-    Y = np.arange(H, dtype=np.float32)[:, None] + 0.5
-    sel = m * ((Y >= min(y_from, y_to)) & (Y <= max(y_from, y_to)))
+    whole, to_band, to_par = bracket_zones(cfg, el)
+    gap = np.clip(_mask((W, H), to_band) - _mask((W, H), to_par), 0, 1)
+    par = fillet_polyline(to_px(cfg, el['parallel']))
+    ya, yb = min(y_from, y_to), max(y_from, y_to)
+    ys_ = [p[1] for p in par]
+    x0, x1 = int(min(p[0] for p in par)) - 30, int(max(p[0] for p in par)) + 30
+    y0, y1 = int(ya) - 8, int(yb) + 8
+    X, Y = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
+    dp = poly_distance(par, X, Y)
+    G = gap[y0:y1, x0:x1]
+    across = np.clip(width / 2 + 0.5 - np.abs(dp - off), 0, 1)
+    along = np.clip(np.minimum(Y - ya, yb - Y) / 2 + 0.5, 0, 1)            # soft, rounded-looking ends
+    core = across * along * (G > 0.5)
+    glow = np.asarray(Image.fromarray((core * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2.5))) / 255.0
     arr = np.asarray(img).astype(np.float32)
+    sub = arr[y0:y1, x0:x1, :3]
     c = np.array(ZONE[colour], np.float32)
-    arr[..., :3] = arr[..., :3] + (c - arr[..., :3]) * sel[..., None] * 0.9
+    hot = c + (np.array([255, 235, 240], np.float32) - c) * 0.55            # the core burns lighter, as on the photo
+    sub = sub + (c - sub) * np.clip(glow * 0.9, 0, 1)[..., None] * G[..., None]
+    sub = sub + (hot - sub) * core[..., None]
+    arr[y0:y1, x0:x1, :3] = sub
     return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), 'RGBA')
 
 
