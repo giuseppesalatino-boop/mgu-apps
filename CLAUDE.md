@@ -20,7 +20,7 @@ L'app raccoglie i layout in tre categorie, scelte dalle impostazioni dell'app (c
 | **Custom** | da definire in seguito | — |
 
 - **Slot** (contenuti intercambiabili, moduli separati che non ridisegnano la cornice):
-  - ID8-A centro: **mappa Waze** oppure **pressione turbo - potenza - coppia** (al posto dell'auto con la strada della foto 3).
+  - ID8-A centro: **mappa Waze** oppure **pressione turbo - potenza - coppia** (al posto dell'auto con la strada della foto 3), quest'ultimo nello **stile delle letture della foto 7** (immagine di dettaglio fornita dall'utente): icona a sinistra, tre valori di scala (minimo, medio, massimo) in cifre squadrate bianche, unità a destra, sotto una barra a doppia linea divisa in 4 segmenti con tagli obliqui, riempita fino al valore, con zona rossa in fondo scala; pannello blu con bande diagonali.
   - ID8-C sinistra: **G-meter** (foto 4), **mappa/navigazione** (foto 6) oppure **4 letture** con scala: boost, refrigerante, olio, temperatura esterna (foto 7).
 - Struttura: un `config.json` (quote normalizzate) e uno statico pre-renderizzato per ogni layout, in cartelle `id7/`, `id8/`, `custom/`; gli slot in una cartella propria, riusabili tra layout. Le foto di riferimento restano fuori da git.
 
