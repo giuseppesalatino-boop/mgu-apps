@@ -790,6 +790,74 @@
           "diesel": 248
         }
       }
+    },
+    "panel": {
+      "_about": "The central frame, symmetric about x 0.5: 'half' is its left half from the top of the axis round to the bottom of the axis (mirrored for the right). Top edge y 158; the upper side parallel to the brackets' upper legs (x = -0.593 y + 558); the speed cut-out (black, y 298..388, its inner side x = -0.588 y + 799.4); the lower side parallel to the lower legs (x = 0.5576 y + 213.7); bottom edge y 584. Measured on the photo's blue mask, both halves within ~6 px of each other. The gear cut-out is the speed one's mirror.",
+      "half": [
+        [
+          0.5,
+          0.21944,
+          0
+        ],
+        [
+          0.24183,
+          0.21944,
+          24
+        ],
+        [
+          0.19859,
+          0.41389,
+          3
+        ],
+        [
+          0.32509,
+          0.41389,
+          3
+        ],
+        [
+          0.29753,
+          0.53889,
+          3
+        ],
+        [
+          0.22398,
+          0.53889,
+          4
+        ],
+        [
+          0.28091,
+          0.81111,
+          16
+        ],
+        [
+          0.5,
+          0.81111,
+          0
+        ]
+      ],
+      "wing_half": [
+        [
+          0.20907,
+          0.22083,
+          8
+        ],
+        [
+          0.23865,
+          0.22083,
+          2
+        ],
+        [
+          0.18151,
+          0.47778,
+          2
+        ],
+        [
+          0.15193,
+          0.47778,
+          2
+        ]
+      ],
+      "_about_wing": "The slanted wing over the speed cut-out (and its mirror over the gear one): parallel to the upper legs, x = -0.593 y + 495.7 to + 552.5, from the top edge to y 344, 5 px apart from the main panel."
     }
   },
   "engine": "petrol",

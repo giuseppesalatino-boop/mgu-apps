@@ -75,10 +75,35 @@ def expand(cfg):
     return cfg
 
 
+def panel_shapes(cfg):
+    """The central frame's closed shapes (px polygons): the main panel (its left half and the mirror) and both wings."""
+    W, H = cfg['grid']
+    out = {}
+    for name, el in cfg['elements'].items():
+        if 'half' not in el:
+            continue
+        half = to_px(cfg, el['half'])
+        full = half + [(W - x, y, r) for x, y, r in reversed(half[1:-1])]
+        out[name] = fillet_closed(full)
+        if 'wing_half' in el:
+            wing = to_px(cfg, el['wing_half'])
+            out[name + '.wing_l'] = fillet_closed(wing)
+            out[name + '.wing_r'] = fillet_closed([(W - x, y, r) for x, y, r in reversed(wing)])
+    return out
+
+
+def fillet_closed(pts):
+    """A closed polygon [(x, y, r)] with its corners rounded (fillet_polyline on the ring)."""
+    ring = pts[-1:] + pts + pts[:1]
+    return fillet_polyline(ring)[1:-1]
+
+
 def outlines(cfg):
     """Every element's outline as a dense px polyline (the reference for --compare)."""
     out = {}
     expand(cfg)
+    for name, poly in panel_shapes(cfg).items():
+        out[name] = poly + [poly[0]]
     for name, el in cfg['elements'].items():
         for key in ('outline', 'parallel', 'band', 'inner'):
             if key in el:
