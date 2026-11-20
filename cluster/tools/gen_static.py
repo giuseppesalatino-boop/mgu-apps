@@ -262,7 +262,9 @@ def big_glyph(ch, w, h, tb, tu):
         'P': [L, T, M, up(0, m1, True)], 'R': [L, T, M, up(0, m1, True), ('quad', (w * 0.45, m1), (w * 0.45 + tu, m1), (w, h), (w - tu, h))],
         'N': [L, R, ('quad', (0, 0), (tu, 0), (w, h), (w - tu, h))], 'S': [('round', 0, 0, w, m1, h * 0.22), ('hole', tu, tb, w + 1, m0, 0),               # rounded, unlike the 5
               ('round', 0, m0, w, h, h * 0.22), ('hole', -1, m1, w - tu, h - tb, 0)],
-        'M': [L, R, T, ((w - tu * 0.8) / 2, 0, (w + tu * 0.8) / 2, h * 0.7)],
+        'M': [L, R,                                                                     # BMW's squared M: a V to 62 %
+              ('quad', (0, 0), (tu * 1.05, 0), (w / 2 + tu * 0.42, h * 0.62), (w / 2 - tu * 0.42, h * 0.62)),
+              ('quad', (w - tu * 1.05, 0), (w, 0), (w / 2 + tu * 0.42, h * 0.62), (w / 2 - tu * 0.42, h * 0.62))],
         'D': [('round', 0, 0, w, h, h * 0.32), (0, 0, w * 0.5, h),                         # square left, rounded right
               ('hole', tu * 0.75, tb, w - tu * 0.95, h - tb, h * 0.16), ('hole', tu * 0.75, tb, w * 0.5, h - tb, 0)],
     }
