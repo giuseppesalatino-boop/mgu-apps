@@ -1,85 +1,86 @@
-# CLAUDE.md — temi cluster fedeli all'OEM per BMW iDrive 7 (cluster-render / MGU App Kit)
+# CLAUDE.md — temi cluster fedeli all'OEM per BMW iDrive 7 (cluster-render / Cluster Themes)
 
-Regole per sviluppare **nuovi temi del quadro strumenti** che riproducono il più fedelmente possibile
-i layout originali BMW iDrive 7 (Live Cockpit Professional, 12,3", 1920 × 720), disegnati con il
-renderer GPU del kit (`vendor/idrive7-apps/kit/renderd`, record.js / gauges.js) o con cluster-render.
+Regole per sviluppare **nuovi temi del quadro strumenti** (1920 × 720, Live Cockpit Professional) che
+riproducono fedelmente i layout originali iDrive 7, con **sfondo `#000000`** e **30 FPS**.
 
-> **Stato del repository.** Questo repo (`mgu-apps`) contiene le app per il display centrale e il kit
-> vendorizzato. Il codice di **cluster-render** (`apps/`, `bench/`, `docs/DEVELOPING.md`, il tema "M"
-> esistente) **non è qui**. Prima di scrivere un tema, leggi quei file nel loro repository e aggiorna
-> le sezioni marcate *[da confermare]* con i nomi reali di API, file e comandi.
+> **Dove sta il codice.** I temi del cluster vivono in **[bimmer-lab/apps](https://github.com/bimmer-lab/apps)**
+> (app `cluster_themes`, motore `shared/`, bench `bench/`, guida `docs/DEVELOPING.md`), non in questo repo
+> (`mgu-apps`, che ha le app per il display centrale e il kit vendorizzato). I percorsi qui sotto sono relativi
+> alla root di bimmer-lab/apps. Prima di lavorare: leggi `docs/DEVELOPING.md`, `bench/README.md` e
+> l'header di `shared/hud.js` (il riferimento di ogni tipo di widget).
 
-## 1. Vincoli non negoziabili
+## 1. Come è fatto un tema (architettura reale)
 
-1. **Sfondo `#000000` puro**, sempre: il `clear` di ogni frame e ogni area "vuota" del cluster sono
-   nero assoluto (sul pannello del cluster il nero = pixel spento, come l'OEM). Non usare i `bg` dei
-   temi di `kit/runtime/themes.js` (`#050506`, `#04060a`, …): sono per il display centrale.
-   Gradienti e pannelli grigi (es. le "conchiglie" del layout Sport) stanno *sopra* il nero, mai al
-   posto del nero.
-2. **30 FPS fissi**: limita il renderer con `gpu.fps(30)` (mgu-render, vedi
-   `vendor/idrive7-apps/kit/renderd/README.md`, "Using it in an app") o con il cap equivalente di
-   cluster-render *[da confermare]*. Il budget è 33,3 ms a frame: il disegno JS deve restare sotto
-   ~8 ms, niente allocazioni per frame (riusa Recorder, array e stringhe), niente `textWidth` ricalcolato
-   per testi statici.
-3. **Movimento come l'OEM**: lancette e barre scorrono con `smooth()` di `gauges.js` (molla
-   criticamente smorzata); i numeri digitali cambiano al massimo ogni 200 ms con `hold()` (velocità,
-   come il cluster BMW). Mai saltare di valore a 30 FPS.
-4. **Nessun marchio BMW disegnato**: niente logo M a tre strisce, logo BMW o nomi di modello come
-   grafica (vedi il commit "theme names without BMW's M" e il Disclaimer del README). Al posto del
-   logo M usa un elemento neutro (tre barrette di colore generico o spazio vuoto). Nomi dei temi
-   senza "M" / "BMW" (es. "Sport", "Track", "Classic").
-5. **Sola lettura**: i valori arrivano dai segnali che l'auto già pubblica (`kit/runtime/signals.js`,
-   `car.js`); un tema non scrive mai su una centralina.
-6. **Nessun software o asset BMW nel repo**: niente screenshot OEM, font OEM estratti, bitmap del
-   cluster. Le immagini di riferimento restano fuori dal repo (o in una cartella ignorata da git);
-   la grafica si ricostruisce in primitive vettoriali.
+- Un tema = **un layout JSON** `apps/cluster_themes/hud/layouts/<id>.json` (`schemaVersion: 2`, `"theme"`
+  = una palette di `shared/hud_themes.js`) + di solito **un widget effect "tutto-in-uno"** (uno shader GLSL
+  in `shared/shaders.js`) che disegna sfondo, scale, archi, pannelli e bagliori, + **widget `text`/`icon`**
+  sopra (numeri delle scale, velocità, marcia, barra inferiore). Esempi: `mview` (M view), `mdash` + `mtach`
+  (M), `sdash` (Sport).
+- Il motore è `shared/hud.js` (`config.target: "panel"`): crea un layer effect per shader e impacchetta i
+  widget immagine in "sheet". Ogni nuovo tipo di widget va: (1) documentato nell'header di `hud.js`,
+  (2) validato in `shared/layouts.js`, (3) creato in `_build` e aggiornato in `_tick` di `hud.js`,
+  (4) aggiunto al bench se serve, (5) elencato in `app.json` (`settings.hudLayout.options`, previews).
+- I layout complessi sono **generati** (`design/gen_*.py`, fuori dal repo): per un tema nuovo scrivi il
+  generatore Python accanto agli altri e rigenera il JSON; non ritoccare a mano un JSON generato.
+- Ogni dato può mancare: `null` → `--` o elemento nascosto, mai un valore inventato. Segnali solo in
+  lettura, dichiarati in `app.json` `signals` (opzionali con `_optional`).
 
-## 2. Fedeltà all'OEM: come misurare
+## 2. Vincoli non negoziabili
 
-- **Si parte dalla foto di riferimento**, raddrizzata e scalata a 1920 × 720. Ogni elemento ha una
-  tabella di misure (centro, raggio, angoli d'inizio/fine, spessori, posizione dei numeri) scritta
-  come costanti in cima al file del tema, con un commento che dice da quale riferimento viene.
-- **Geometria prima del colore**: archi, scale e tacche devono coincidere con la foto entro ±2 px
-  sovrapponendo il render del bench alla foto al 50% di opacità.
-- **Scale OEM**: tachimetro 0–330 km/h (numeri ogni 30, tacca lunga ogni 30, corta ogni 10);
-  contagiri 0–8 ×1000 1/min con zona rossa da regime della vettura; carburante 0 – 1/2 – 1 con
-  riserva rossa; olio 50 – 100 – 150 °C (blu sotto 50, rosso sopra ~140); refrigerante 70 – 100 – 130 °C;
-  boost 0 – 10 – 20 psi. Le unità seguono le impostazioni dell'auto (km/h ↔ mph, °C ↔ °F, psi ↔ bar).
-- **Tipografia**: numeri in stile DIN-condensato bianco, unità più piccole e più chiare
-  (`km/h`, `1/min x1000`, `°C`). Usa i font cotti del kit (`kit/runtime/fonts/num.json`, `bold.json`,
-  `light.json`, `gear.json`); se serve un glifo mancante, aggiungilo con `kit/tools/bake_fonts.py` da
-  un font con licenza libera, mai da un font BMW.
-- **Palette OEM** (punto di partenza, da tarare sulla foto): bianco scala `#ffffff`, tacche secondarie
-  `#bfc3c8`, pannelli `#2a2d33`→`#15171b`, rosso M/redline `#e1001a`, bagliore rosso `#ff1f2d` al 35–60%
-  di alfa, blu freddo `#2f7bff`, verde spie `#3ddc4a`, ambra `#ffb31a`.
-- **Bagliori e sfumature** (il rosso alla base delle scale, l'alone sotto la lancetta) si fanno con
-  `rampRect` / `arc` a più passaggi con alfa decrescente, mai con bitmap.
+1. **Sfondo `#000000` puro.** Il ruolo `bg` della palette è `[0, 0, 0, 255]` e lo shader parte da
+   `vec4(0.0, 0.0, 0.0, 1.0)`; ogni area "vuota" è nero assoluto (il layer copre i gauge BMW sotto, quindi
+   il nero deve essere opaco). Pannelli grigi, bagliori e gradienti stanno *sopra* il nero, mai al suo posto.
+   Nessun `vec4` trasparente nelle zone che devono nascondere il cluster BMW, tranne il buco della mappa.
+2. **30 FPS.** Oggi `hud.js` aggiorna gli uniform a 20 Hz (`TICK_MS = 50`, condiviso con la HUD) e i testi
+   a 5 Hz (`TEXT_MS = 200`, come l'OEM: non toccarlo). Per i 30 FPS del cluster:
+   - tick del target `panel` a **33 ms** (costante per target, non cambiare quella della HUD);
+   - le animazioni continue dentro lo shader usano `time: true` con **`time_fps: 30`** (opzione dei layer
+     effect in `shared/cluster_render_client.js`), mai un clock JS a frequenza più alta;
+   - inviare un uniform **solo se il valore quantizzato è cambiato** (pattern `key === x.last` già usato da
+     `mview`/`mdash`): a fermo zero messaggi.
+   - Budget: lo shader deve passare `node tools/shader_budget.js --all` senza avvisi.
+3. **Limiti di cluster-render**: max **8 layer per connessione** (32 totali, `"conn": 1..3` per averne
+   altri), **16 MiB** di memoria pixel (ogni immagine conta due volte). Widget effect prima nel file, testi
+   dopo. Il log del rebuild deve dire ≤ 8 layer.
+4. **Visibilità reale** (`shared/visible.js`): il cofano nasconde gli angoli alti (fino a y 273 a sinistra,
+   y 240 a destra); BMW disegna il riquadro nero della marcia a x 1406–1597 y 342–419 e la spia cintura a
+   x 587–626 y 663–700. Niente informazioni importanti lì; il check del layout non deve dare avvisi nuovi.
+   La lettera della marcia BMW in basso a destra resta scoperta (widget `fill` `strip_cover_l/_r`).
+5. **Marchi**: non disegnare il logo BMW né il logo M come grafica nuova; nomi di tema senza "BMW".
+   (Il widget `stripe` e il `badge` esistenti sono opzioni dell'utente, off di default: non attivarli
+   di default in un tema nuovo.) Nessuna foto OEM, font OEM o bitmap del cluster nel repo: le foto di
+   riferimento stanno in `design/photos/` fuori dal repo.
+6. **Font**: Barlow pre-cotto in atlanti (`apps/cluster_themes/hud/fonts/*.json`, `tools/bake_fonts.py`);
+   un nuovo corpo o glifo si cuoce da lì, mai da un font BMW. L'auto non rasterizza font.
+7. **Crash safety**: ogni timer/evento passa dal `_guard` di `hud.js`; una seconda uscita inattesa
+   disinstalla l'app sull'auto.
 
-## 3. Struttura di un tema *[da confermare con docs/DEVELOPING.md]*
+## 3. Fedeltà all'OEM: come misurare
 
-- Un tema = un modulo che esporta `{ id, name, layout, palette, draw(rec, state, t) }`.
-  `draw` riceve un Recorder (`kit/runtime/record.js`) già pulito con `#000000` e lo stato del veicolo
-  già normalizzato (velocità, giri, marcia, modalità di guida, carburante, temperature, TPMS,
-  autonomia, ora, temperatura esterna, limite di velocità, nome della via).
-- Costanti di layout separate dal codice di disegno; nessun numero "magico" dentro `draw`.
-- Elementi riutilizzabili (scala ad arco, barra contagiri curva, mini-gauge carburante/olio,
-  widget TPMS, cartello limite, barra di stato inferiore) vanno in moduli condivisi, non copiati
-  tra temi.
-- Ogni dato può mancare: `null` → `--` o elemento nascosto, mai un valore inventato.
+- Si parte dalla **foto di riferimento raddrizzata a 1920 × 720** (come `design/photos/ref-m8-cluster.png`
+  per M). Le misure (percorsi delle scale, centri e raggi, angoli, posizioni dei numeri) diventano
+  costanti del generatore, con un commento che dice da quale foto e con quale correzione vengono.
+- **Geometria prima del colore**: sovrapponi lo screenshot del bench (`?only=1&clean=1`) alla foto al 50%:
+  scale, tacche e numeri entro **±2 px**.
+- **Scale OEM** (dalle foto): tachimetro 0–330 km/h (numeri ogni 30) / 0–200 mph; contagiri 0–8 ×1000 con
+  zona rossa dal setting `redline`; carburante 0 – ½ – 1 con riserva rossa; olio 50 – 100 – 150 °C;
+  refrigerante 70 – 100 – 130 °C; boost 0 – 10 – 20 psi. Unità dal setting `units`.
+- **Movimento come l'OEM**: lancette e barre scorrono (rpm già filtrato 120 ms in `hud.js`, quantizzazione
+  fine: 400–1000 passi); numeri digitali a 5 Hz.
+- **Palette**: ruoli in `hud_themes.js` (riusa `mdash` per i look M: `fg [238,241,246]`, `accent [226,36,44]`,
+  `chrome`, `grey`, `redTrack`); tara i colori sulla foto, non a occhio.
+- Bagliori, vetri e sfumature si fanno **nello shader** (smoothstep, distanze), mai con bitmap.
 
 ## 4. Verifica prima di consegnare
 
-1. Bench / emulatore *[comando da confermare in `bench/README.md`]*: render a 1920 × 720 con valori di
-   prova (0 km/h, minimo, metà scala, fondo scala, redline, carburante in riserva, olio freddo).
-2. Confronto sovrapposto con la foto di riferimento (diff a ±2 px sulla geometria).
-3. Log FPS: 30 stabili, tempo per frame nel log del renderer (`display: … fps sent, renderer …`).
-4. Test del kit e dell'app interessata (`npm test` nella cartella dell'app; i test del kit sono in
-   `vendor/idrive7-apps/kit/tools/test_*.js`).
-5. Nessun asset BMW aggiunto (`git status` prima del commit).
+```sh
+node bench/server.js cluster_themes          # http://localhost:8078, "Manual" per i valori di prova
+node tools/shader_budget.js --all            # nessun segno di crash
+```
 
-## 5. Convenzioni del repository
-
-- Una cartella per app con `app/` (`app.json` + codice), registrata in `mgu-repo.json`.
-- Il kit in `vendor/idrive7-apps` è vendorizzato: non modificarlo direttamente; le modifiche vanno in
-  `patches/` come per quella esistente.
-- Commit in stile `mgu-apps X.Y.Z: <cosa cambia>`; documentazione utente in inglese nei README.
+1. Valori di prova: 0 km/h, minimo, metà scala, fondo scala, redline, riserva, olio freddo, dati mancanti.
+2. Car view attiva: nessun avviso nuovo di `visible.js` (cofano, riquadro marcia, spia cintura).
+3. Log del rebuild: ≤ 8 layer per connessione, memoria pixel sotto il limite.
+4. Screenshot headless (`--virtual-time-budget=20000 --window-size=1920,720`) sovrapposto alla foto.
+5. Con "Show Waze map inside the theme" il tema apre la finestra mappa e la richiude senza artefatti.
+6. CHANGELOG e README dell'app aggiornati ("Not yet tested on a car" finché non è provato sull'auto).
