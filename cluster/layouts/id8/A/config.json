@@ -486,8 +486,8 @@
         }
       },
       "labels": {
-        "_about": "The gauge's labels in the speed scale's own digits (same size, 22 px, same spacing), left edge and centre height measured on the photo; the pump is the ISO 2575 fuel symbol drawn as shapes in BMW's style (tools/gen_static.py draw_pump), with the arrow to the filler side, in its 35 x 28 px box.",
-        "sx": 1.0,
+        "_about": "The gauge's labels in the speed scale's digits, narrowed to the photo's width (sx 0.7; uprights keep their thickness), 'gap' px apart, left edge and centre height measured on the photo; the pump is the ISO 2575 fuel symbol drawn as shapes in BMW's style (tools/gen_static.py draw_pump), with the arrow to the filler side, in its 35 x 28 px box.",
+        "sx": 0.7,
         "color": [
           237,
           238,
@@ -500,7 +500,7 @@
               0.19323,
               0.60903
             ],
-            "h": 22
+            "h": 20
           },
           {
             "text": "1/2",
@@ -529,7 +529,8 @@
             35,
             28
           ]
-        }
+        },
+        "gap": 2.6
       }
     },
     "oil": {
