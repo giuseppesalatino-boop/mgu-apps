@@ -460,6 +460,30 @@
           151,
           175
         ]
+      },
+      "warn": {
+        "_about": "The fuel track's fill turns yellow at the reserve and red near empty (dynamic layer). 'by' is chosen in the app: litres in the tank or the range; both come from KombiIF statusRangeTankStatus.",
+        "by": "litres",
+        "litres": {
+          "yellow": 8,
+          "red": 4
+        },
+        "range_km": {
+          "yellow": 90,
+          "red": 50
+        },
+        "colors": {
+          "yellow": [
+            255,
+            196,
+            0
+          ],
+          "red": [
+            235,
+            30,
+            40
+          ]
+        }
       }
     },
     "oil": {
