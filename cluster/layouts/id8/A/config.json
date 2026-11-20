@@ -96,7 +96,7 @@
       ],
       "_about_parallel": "The parallel just inside the outer profile: the inner edge of the light outer stripe (15 px thick across on the upper leg, 11 on the lower; upper x = -0.5911 y + 363.7, lower x = 0.5755 y - 13.1, measured square to the legs on the photo), from the top line down to y 625 and on along the foot's top edge to the inner profile. The graduated marks sit in the dark gap just inside it.",
       "ticks": {
-        "_about": "The graduated marks: one short level dash per number, in the dark gap just inside the parallel (from the parallel + start to + start + length, px), at the photo's heights. The scale is not even in value: 60 km/h per mark above 150, 30 below, the marks ~56 / ~59 px apart. 60, 30 and 0 sit in the lit part of the photo: their heights follow the 59 px spacing (60 found at 495). Two full scales on the same marks, chosen in the app: 330 (30 km/h a step to 150, then 60) and 260 (20 a step to 60, then 40); a speed's height comes from its two neighbouring marks of the chosen scale.",
+        "_about": "The graduated marks: one short level dash per number, in the dark gap just inside the parallel (from the parallel + start to + start + length, px), at the photo's heights. The scale is not even in value: 60 km/h per mark above 150, 30 below, the marks ~56 / ~59 px apart. 60, 30 and 0 sit in the lit part of the photo: their heights follow the 59 px spacing (60 found at 495). Two full scales on the same marks, chosen in the app: 330 (30 km/h a step to 150, then 60) and 260 (20 a step to 60, then 40); a speed's height comes from its two neighbouring marks of the chosen scale. In mph: 200 (20 a step to 120, then 40) for the 330 km/h scale and 160 (20 a step) for the 260.",
         "y": [
           0.20903,
           0.28611,
@@ -129,6 +129,28 @@
             180,
             140,
             100,
+            60,
+            40,
+            20,
+            0
+          ],
+          "200mph": [
+            200,
+            160,
+            120,
+            100,
+            80,
+            60,
+            40,
+            20,
+            0
+          ],
+          "160mph": [
+            160,
+            140,
+            120,
+            100,
+            80,
             60,
             40,
             20,
