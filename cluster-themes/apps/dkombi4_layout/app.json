@@ -1,5 +1,5 @@
 {
-  "id": "cluster_themes",
+  "id": "dkombi4_layout",
   "title": "Cluster Themes",
   "description": "Redraws the instrument cluster in an OEM-faithful iDrive 7 look: Strada (speed and revs either side of the map) and Corsa (the gear between two rev blades, coolant, boost and tyres)",
   "version": "0.20.0",

@@ -71,9 +71,9 @@
       }
     },
     {
-      "id": "cluster_themes",
+      "id": "dkombi4_layout",
       "kind": "app",
-      "path": "cluster-themes/apps/cluster_themes",
+      "path": "cluster-themes/apps/dkombi4_layout",
       "title": "Cluster Themes",
       "description": "The instrument cluster redrawn in an OEM-faithful iDrive 7 look: Strada and Corsa",
       "mguHmi": [

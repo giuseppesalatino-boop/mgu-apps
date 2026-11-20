@@ -2,7 +2,7 @@
 # Push edited layouts to the car over SSH, without reinstalling the app.
 #
 #   ./scripts/deploy.sh root@<car-ip-or-hostname> [layout.json ...]
-#   APP=cluster_themes ./scripts/deploy.sh root@<car> gt3.json      (the cluster app; default: HUD Widgets)
+#   APP=dkombi4_layout ./scripts/deploy.sh root@<car> gt3.json      (the cluster app; default: HUD Widgets)
 #
 # With no files it pushes the app's built-in layouts from apps/<app>/hud/layouts/.
 # They land in the app's data folder, <app>/data/layouts/, where a file overrides the
