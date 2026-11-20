@@ -4,14 +4,14 @@ Regole per sviluppare **nuovi temi del quadro strumenti** (1920 × 720, Live Coc
 riproducono fedelmente i layout originali iDrive 7, con **sfondo `#000000`** e **30 FPS**.
 
 > **Dove sta il codice.** I temi del cluster vivono in **[bimmer-lab/apps](https://github.com/bimmer-lab/apps)**
-> (app `dkombi4_layout`, motore `shared/`, bench `bench/`, guida `docs/DEVELOPING.md`), non in questo repo
+> (app `dkombi4_layouts`, motore `shared/`, bench `bench/`, guida `docs/DEVELOPING.md`), non in questo repo
 > (`mgu-apps`, che ha le app per il display centrale e il kit vendorizzato). I percorsi qui sotto sono relativi
 > alla root di bimmer-lab/apps. Prima di lavorare: leggi `docs/DEVELOPING.md`, `bench/README.md` e
 > l'header di `shared/hud.js` (il riferimento di ogni tipo di widget).
 
 ## 1. Come è fatto un tema (architettura reale)
 
-- Un tema = **un layout JSON** `apps/dkombi4_layout/hud/layouts/<id>.json` (`schemaVersion: 2`, `"theme"`
+- Un tema = **un layout JSON** `apps/dkombi4_layouts/hud/layouts/<id>.json` (`schemaVersion: 2`, `"theme"`
   = una palette di `shared/hud_themes.js`) + di solito **un widget effect "tutto-in-uno"** (uno shader GLSL
   in `shared/shaders.js`) che disegna sfondo, scale, archi, pannelli e bagliori, + **widget `text`/`icon`**
   sopra (numeri delle scale, velocità, marcia, barra inferiore). Esempi: `mview` (M view), `mdash` + `mtach`
@@ -50,7 +50,7 @@ riproducono fedelmente i layout originali iDrive 7, con **sfondo `#000000`** e *
    (Il widget `stripe` e il `badge` esistenti sono opzioni dell'utente, off di default: non attivarli
    di default in un tema nuovo.) Nessuna foto OEM, font OEM o bitmap del cluster nel repo: le foto di
    riferimento stanno in `design/photos/` fuori dal repo.
-6. **Font**: Barlow pre-cotto in atlanti (`apps/dkombi4_layout/hud/fonts/*.json`, `tools/bake_fonts.py`);
+6. **Font**: Barlow pre-cotto in atlanti (`apps/dkombi4_layouts/hud/fonts/*.json`, `tools/bake_fonts.py`);
    un nuovo corpo o glifo si cuoce da lì, mai da un font BMW. L'auto non rasterizza font.
 7. **Segnali e installazione dallo Store**: il build scrive per ogni interfaccia di `app.json` `signals`
    l'istanza `_instances` (default `"1"`), e l'installazione dallo Store **fallisce del tutto** se l'unità
@@ -91,7 +91,7 @@ riproducono fedelmente i layout originali iDrive 7, con **sfondo `#000000`** e *
 ## 4. Verifica prima di consegnare
 
 ```sh
-node bench/server.js dkombi4_layout          # http://localhost:8078, "Manual" per i valori di prova
+node bench/server.js dkombi4_layouts          # http://localhost:8078, "Manual" per i valori di prova
 node tools/shader_budget.js --all            # nessun segno di crash
 ```
 

@@ -1,7 +1,7 @@
 {
-  "id": "dkombi4_layout",
-  "title": "Cluster Themes",
-  "description": "Redraws the instrument cluster in an OEM-faithful iDrive 7 look: Strada (speed and revs either side of the map) and Corsa (the gear between two rev blades, coolant, boost and tyres)",
+  "id": "dkombi4_layouts",
+  "title": "Quadro Strumenti",
+  "description": "Ridisegna il quadro strumenti con l'aspetto originale iDrive 7: Strada (velocità e giri ai lati della mappa) e Corsa (marcia tra due lame del contagiri, refrigerante, boost e pneumatici)",
   "version": "0.20.0",
   "vendor": "custom",
   "loggingId": "OAC1",
@@ -95,7 +95,7 @@
     {
       "name": "MAIN",
       "kind": "canvas",
-      "title": "Cluster Themes",
+      "title": "Quadro Strumenti",
       "buttons": [
         [
           "BTN_SETTINGS",

@@ -7,7 +7,7 @@ apps/<app>/hud/previews/<layout>.json = { big, small[, full]: {w, h, z} } (full:
 zlib-deflated RGBA rows (opaque). The build packs hud/ into hud.pack; previews.js inflates them.
 
     # the app's bench must be running (node bench/server.js <app>, BENCH_PORT=...)
-    uv run -q --with pillow python -I tools/previews.py dkombi4_layout 8078
+    uv run -q --with pillow python -I tools/previews.py dkombi4_layouts 8078
     ... idrive_hud_widgets 8079
 
 The bench's settings are put back afterwards. The raw shots are kept in ../design/previews-src/<app>/.

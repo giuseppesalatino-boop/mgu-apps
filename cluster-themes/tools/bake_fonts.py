@@ -108,7 +108,7 @@ CLUSTER_FONTS = [
     ('b_gear', 'Outfit[wght].ttf', 32, DIGITS + 'PRNDSM-', 0, 'SemiBold'),
     ('b_scale', 'Outfit[wght].ttf', 20, DIGITS, 0, 'Medium'),
 ]
-FONTS = {'idrive_hud_widgets': HUD_FONTS, 'dkombi4_layout': CLUSTER_FONTS}
+FONTS = {'idrive_hud_widgets': HUD_FONTS, 'dkombi4_layouts': CLUSTER_FONTS}
 PAD = 2
 ATLAS_W = 1024
 
