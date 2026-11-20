@@ -842,12 +842,12 @@
           14
         ],
         [
-          0.23887,
+          0.23775,
           0.22083,
           2
         ],
         [
-          0.17865,
+          0.18139,
           0.47778,
           2
         ],
@@ -857,7 +857,7 @@
           2
         ]
       ],
-      "_about_wing": "The left wing, not the panel's parallel: its left edge x = -0.583 y + 491.6, its right edge steeper, x = -0.625 y + 558, so the gap to the panel (x = -0.585 y + 556.5) opens from ~5 px at the top to ~10 at the bottom; top y 159, bottom y 344, the big round on its outer top corner. Measured row by row on the photo's blue mask.",
+      "_about_wing": "The left wing: left edge x = -0.583 y + 491.6, right edge parallel to the panel's (x = -0.585 y + 556.5) 7 px off it, so the black gap between them is even; top y 159, bottom y 344, the big round on its outer top corner.",
       "gear_cut": [
         [
           0.70559,
