@@ -610,6 +610,20 @@ def feet_glow(img, cfg):
     return img
 
 
+def fit_view(img, cfg):
+    """The finished layer scaled about the view's centre (config 'view'), so the layout stays inside the car's
+    visible area (config 'visible')."""
+    v = cfg.get('view')
+    if not v or v.get('scale', 1) == 1:
+        return img
+    W, H = cfg['grid']
+    k, cx, cy = v['scale'], v['cx'] * W, v['cy'] * H
+    big = img.resize((W * 2, H * 2), Image.LANCZOS)          # resample from a larger copy, then down
+    out = big.transform((W, H), Image.AFFINE, (2 / k, 0, 2 * (cx - cx / k), 0, 2 / k, 2 * (cy - cy / k)),
+                        resample=Image.BICUBIC, fillcolor=(0, 0, 0, 255))
+    return out
+
+
 def build_static(cfg):
     """The static layer, RGBA at grid size: each bracket filled zone by zone (band, gap, stripe), then its lines and marks."""
     expand(cfg)
@@ -698,12 +712,13 @@ def main():
     cat, name = a.layout.split('/')
     folder = os.path.join(ROOT, 'layouts', cat, name)
     cfg = json.load(open(os.path.join(folder, 'config.json'), encoding='utf-8'))
-    static = build_static(cfg)
+    raw = build_static(cfg)                                    # at the reference photo's size
+    static = fit_view(raw, cfg)                                # fitted to the car's visible area
     static.save(os.path.join(folder, 'static.png'))
     print('static: ' + os.path.relpath(os.path.join(folder, 'static.png'), ROOT))
     if a.compare:
         ref = os.path.join(ROOT, 'design', 'refs', cat, name + '.png')
-        print('compare: ' + os.path.relpath(compare(cfg, static, ref, os.path.join(ROOT, 'design', 'out', '%s_%s_compare.png' % (cat, name))), ROOT))
+        print('compare: ' + os.path.relpath(compare(cfg, raw, ref, os.path.join(ROOT, 'design', 'out', '%s_%s_compare.png' % (cat, name))), ROOT))
 
 
 if __name__ == '__main__':

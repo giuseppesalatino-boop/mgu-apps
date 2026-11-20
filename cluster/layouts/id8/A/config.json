@@ -1191,5 +1191,21 @@
   "engine": "petrol",
   "_about_engine": "'engine' (set by the app): petrol or diesel. It picks the rev scale (8 or 6, rev_zones) and the right gauge: oil 50-150 C (petrol) or coolant 50-130 C with its middle mark at 90 (diesel), each with its own icon.",
   "units": "metric",
-  "_about_units": "'units' (set by the app, the same setting as km/h / mph): metric or imperial. Imperial: mph scales, the right gauge in F (oil 120-210-300, coolant 120-190-260, label F), torque in lb-ft."
+  "_about_units": "'units' (set by the app, the same setting as km/h / mph): metric or imperial. Imperial: mph scales, the right gauge in F (oil 120-210-300, coolant 120-190-260, label F), torque in lb-ft.",
+  "visible": {
+    "_about": "The part of the panel that shows on the car (the user's markup on the grid-fitted photo of the car, Nov 2026): x 215..1705, y 110..606, top corners rounded on the cowl's curve. Nothing may draw outside it.",
+    "box": [
+      0.11198,
+      0.15278,
+      0.88802,
+      0.84167
+    ],
+    "corner": 90
+  },
+  "view": {
+    "_about": "The whole layout (measured on the reference photo at full panel size) scaled about (cx, cy) to fit 'visible': applied to the finished static layer and, later, to every dynamic element.",
+    "scale": 0.84,
+    "cx": 0.5,
+    "cy": 0.51667
+  }
 }
