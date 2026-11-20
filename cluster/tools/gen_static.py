@@ -384,15 +384,37 @@ def draw_panel(img, cfg):
             continue
         m = Image.new('L', img.size, 0)
         ImageDraw.Draw(m).polygon([(x * SS, y * SS) for x, y in poly], fill=255)
-        if name.endswith(('.wing_l', '.wing_r')):
-            fill = Image.new('RGBA', img.size, tuple(col['wing']) + (255,))
+        stops = col['wing'] if name.endswith(('.wing_l', '.wing_r')) else col['rows']
+        if stops and not isinstance(stops[0][0], (list, tuple)) and len(stops) == 3 and isinstance(stops[0], int):
+            fill = Image.new('RGBA', img.size, tuple(stops) + (255,))
         else:
-            ys, cs = [r[0] for r in col['rows']], np.array([r[1] for r in col['rows']], np.float32)
+            ys, cs = [r[0] for r in stops], np.array([r[1] for r in stops], np.float32)
             yy = (np.arange(img.size[1]) + 0.5) / SS
             grad = np.stack([np.interp(yy, ys, cs[:, k]) for k in range(3)], -1)
             arr = np.repeat(grad[:, None, :], img.size[0], axis=1).astype(np.uint8)
             fill = Image.fromarray(np.dstack([arr, np.full(arr.shape[:2], 255, np.uint8)]), 'RGBA')
         img.paste(fill, (0, 0), m)
+
+
+def draw_bar(img, cfg):
+    """The grey bar under the frame: slanted ends, lighter along its middle (supersampled canvas)."""
+    W, H = cfg['grid']
+    for el in cfg['elements'].values():
+        b = el.get('bar')
+        if not b:
+            continue
+        x0, x1 = b['x'][0] * W, b['x'][1] * W
+        y0, y1 = b['y'][0] * H, b['y'][1] * H
+        sl = b['slant']
+        poly = [(x0 + sl, y0), (x1 - sl, y0), (x1, y1), (x0, y1)]
+        m = Image.new('L', img.size, 0)
+        ImageDraw.Draw(m).polygon([(x * SS, y * SS) for x, y in poly], fill=255)
+        yy = (np.arange(img.size[1]) + 0.5) / SS
+        t = np.clip((yy - y0) / (y1 - y0), 0, 1)
+        f = b['edge'] + (1 - b['edge']) * np.sin(np.pi * t) ** 0.7
+        col = np.array(b['color'], np.float32)[None, :] * f[:, None]
+        arr = np.repeat(np.clip(col, 0, 255)[:, None, :], img.size[0], axis=1).astype(np.uint8)
+        img.paste(Image.fromarray(np.dstack([arr, np.full(arr.shape[:2], 255, np.uint8)]), 'RGBA'), (0, 0), m)
 
 
 def draw_gauges(d, cfg, sc):
@@ -571,6 +593,7 @@ def build_static(cfg):
         for x0, y0, x1, y1 in tick_rects(cfg, el):
             d.rectangle([x0 * SS, y0 * SS, x1 * SS, y1 * SS], fill=tuple(col['tick']))
     draw_panel(img, cfg)
+    draw_bar(img, cfg)
     d = ImageDraw.Draw(img)
     draw_gauges(d, cfg, sc)
     img = img.resize((W, H), Image.LANCZOS)

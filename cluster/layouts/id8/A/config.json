@@ -956,9 +956,30 @@
           ]
         ],
         "wing": [
-          3,
-          58,
-          142
+          [
+            160,
+            [
+              8,
+              76,
+              192
+            ]
+          ],
+          [
+            250,
+            [
+              2,
+              55,
+              146
+            ]
+          ],
+          [
+            345,
+            [
+              2,
+              46,
+              116
+            ]
+          ]
         ]
       }
     },
@@ -998,6 +1019,48 @@
         ]
       },
       "sample": "D"
+    },
+    "label_speed_live_unit": {
+      "_about": "The unit under the big speed, fitted to the photo's box (x 476-534, y 382-401); mph with an mph scale.",
+      "label": {
+        "text": "km/h",
+        "text_mph": "mph",
+        "font": "BarlowSemiCondensed-Medium.ttf",
+        "box": [
+          0.24792,
+          0.53056,
+          0.27865,
+          0.55694
+        ],
+        "color": [
+          144,
+          163,
+          219
+        ],
+        "bold": 0.012,
+        "scale_of": "bracket_left",
+        "lift_mph": 3
+      }
+    },
+    "bottom_bar": {
+      "_about": "The grey bar under the frame: x 517-1403 (symmetric), y 621-631, ends cut slanted like the frame's lower sides, lighter along its middle (a slight tube).",
+      "bar": {
+        "x": [
+          0.26927,
+          0.73073
+        ],
+        "y": [
+          0.8625,
+          0.87639
+        ],
+        "slant": 6,
+        "color": [
+          187,
+          188,
+          206
+        ],
+        "edge": 0.78
+      }
     }
   },
   "engine": "petrol",
