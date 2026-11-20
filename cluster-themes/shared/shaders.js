@@ -1408,12 +1408,18 @@ uniform vec2 u_size;
 uniform vec2 u_path[32];   // the left scale's line, layer px
 uniform float u_cum[32];   // arc length at each point
 uniform float u_n;         // points used
-uniform vec4 u_scale;      // arc length at 0 and at the top mark, -, the line's whole length
+uniform vec4 u_scale;      // speed: arc length at 0 and at the top mark; rpm: the same
+uniform float u_total;     // the line's whole length
 uniform vec4 u_ticks;      // speed: numbered marks, steps per number; rpm: the same
-uniform float u_speed;     // 0..1
-uniform float u_rpm;       // 0..1
-uniform float u_redFrom;   // 0..1 of the rev scale
-uniform float u_orange;    // 0..1, orange marks from here to the redline
+uniform float u_mk[12];    // speed: arc length of each numbered mark (BMW's scale is not even along the line)
+uniform float u_mkR[12];   // rpm: the same
+uniform vec4 u_tk[12];     // speed: each numbered mark's line, from the scale line in towards its number
+uniform vec4 u_tkR[12];    // rpm: the same (left frame, mirrored)
+uniform float u_speed;     // arc length of the speed now
+uniform float u_rpm;       // arc length of the revs now
+uniform vec4 u_ndl;        // the speed needle: from x, y to x, y (left frame)
+uniform vec4 u_ndlR;       // the rev needle (left frame, mirrored)
+uniform float u_redS;      // arc length of the redline
 uniform vec4 u_dial;       // fuel dial: centre x, y, radius (the oil dial is its mirror)
 uniform vec2 u_dialAng;    // its angle (degrees, 0 = right, 90 = down) at full and at empty
 uniform float u_fuel;      // 0..1
@@ -1424,6 +1430,9 @@ uniform float u_holeR;
 uniform vec4 u_panel;      // the dark panel's inner edge: its top point x, y and its point at the middle x, y
 uniform vec4 u_panelB;     // its bottom point x, y; z: how far inside the line the panel starts (0 = no panel)
 uniform float u_oval;      // > 0: the map window is an oval inside u_hole, feathered over this many px
+uniform float u_lineR;     // 1: the line under the speed has a mirror on the right (0: the tyre block is there)
+uniform vec4 u_tyre;       // the tyre block (right, screen px): centre x, y of the car glyph; z: 1 = shown; w: the
+                           // header icon's centre x (its y is u_tyre.y - 131)
 
 const vec3 WHITE = vec3(0.92, 0.93, 0.95);
 const vec3 GREY = vec3(0.55, 0.57, 0.6);
@@ -1434,6 +1443,11 @@ const vec3 BLUE = vec3(0.25, 0.55, 1.0);
 
 float cov(float d) { return clamp(0.5 - d, 0.0, 1.0); }
 vec3 put(vec3 c, vec3 col, float a) { return mix(c, col, clamp(a, 0.0, 1.0)); }
+float segd(vec2 p, vec2 a, vec2 b) {
+    vec2 ba = b - a;
+    float h = clamp(dot(p - a, ba) / max(dot(ba, ba), 0.001), 0.0, 1.0);
+    return length(p - a - ba * h);
+}
 
 void main() {
     vec2 p = v_uv * u_size;
@@ -1452,10 +1466,9 @@ void main() {
         float dist = length(d);
         if (dist < best) { best = dist; s = u_cum[i] + h * L; sd = (ba.x * d.y - ba.y * d.x) / L; }
     }
-    float total = u_scale.w, s0 = u_scale.x, s1 = u_scale.y;
-    float v = right ? u_rpm : u_speed;
-    float sv = mix(s0, s1, v);
-    float f = (s - s0) / (s1 - s0);
+    float total = u_total;
+    float s0 = right ? u_scale.z : u_scale.x, s1 = right ? u_scale.w : u_scale.y;
+    float sv = right ? u_rpm : u_speed;
 
     // the dark panel inside the scale: from a little inside the line to the chevron edge facing the middle
     if (u_panelB.z > 0.0 && sd > 0.0) {
@@ -1494,25 +1507,31 @@ void main() {
         float ends = smoothstep(0.0, 40.0, s) * smoothstep(0.0, 30.0, total - s);
         c = put(c, WHITE, cov(abs(sd) - 1.6) * ends);
         c = put(c, GREY, cov(abs(sd - 7.0) - 0.8) * ends * 0.5);
-        // the marks inside it: a long one at each number and a short one between two
+        // the short marks between two numbers, square to the line
         vec2 tk = right ? u_ticks.zw : u_ticks.xy;
-        float stp = (s1 - s0) / (tk.x * tk.y);
-        float t = (s - s0) / stp, k = floor(t + 0.5);
-        float along = abs(t - k) * stp;
-        bool major = mod(k, tk.y) < 0.5;
-        float len = major ? 26.0 : 14.0;
-        if (k >= 0.0 && k <= tk.x * tk.y && sd > 0.0) {
-            float a = cov(along - (major ? 1.7 : 1.1)) * cov(sd - len) * smoothstep(2.0, 4.0, sd);
-            c = put(c, major ? WHITE : GREY, a);
+        for (int i = 0; i < 11; i++) {
+            if (float(i) >= tk.x) break;
+            float ma = right ? u_mkR[i] : u_mk[i], mb = right ? u_mkR[i + 1] : u_mk[i + 1];
+            if (s > ma && s < mb && sd > 0.0) {
+                float stp = (mb - ma) / tk.y, t = (s - ma) / stp, k = floor(t + 0.5);
+                if (k > 0.5 && k < tk.y - 0.5)
+                    c = put(c, GREY, cov(abs(t - k) * stp - 1.1) * cov(sd - 13.0) * smoothstep(2.0, 4.0, sd));
+            }
         }
-        // the rev scale: red then orange dashes outside the line, from the redline on
-        if (right && f >= u_orange && f <= 1.0 && sd < -5.0 && sd > -15.0) {
-            float gap = cov(abs(mod(s - s0, 46.0) - 23.0) - 19.0);
-            c = put(c, f >= u_redFrom ? RED : vec3(1.0, 0.82, 0.1), cov(abs(sd + 10.0) - 3.5) * gap);
-        }
-        // the needle: a red bar across the line, stopping short of the numbers (centred 56 px in)
-        float nb = cov(abs(s - sv) - 3.0) * smoothstep(-14.0, -8.0, sd) * (1.0 - smoothstep(30.0, 36.0, sd));
-        c = put(c, RED, nb);
+        // the red zone of the rev scale: on the line, from the redline to the top mark
+        if (right && s >= u_redS && s <= s1 + 2.0 && sd > -2.6 && sd < 6.0)
+            c = put(c, RED, smoothstep(u_redS, u_redS + 3.0, s) * cov(abs(sd - 1.7) - 4.2));
+    }
+    // the long marks, one at each number, from the line in towards it (BMW's run like spokes, not square to the line)
+    for (int i = 0; i < 12; i++) {
+        if (float(i) > (right ? u_ticks.z : u_ticks.x)) break;
+        vec4 g = right ? u_tkR[i] : u_tk[i];
+        c = put(c, WHITE, cov(segd(q, g.xy, g.zw) - 1.5));
+    }
+    // the needle: a red bar from the line in towards the numbers
+    {
+        vec4 g = right ? u_ndlR : u_ndl;
+        c = put(c, RED, cov(segd(q, g.xy, g.zw) - 3.2));
     }
 
     // the corner dial: fuel (left) or oil temperature (right), its value as a red mark
@@ -1528,9 +1547,13 @@ void main() {
         if (!right && df < 0.12) rim = RED;
         if (right && df < 0.15) rim = BLUE;
         if (right && df > 0.85) rim = RED;
+        // BMW's bracket: a dark band 26 px deep, lighter towards its outer edge, between a white line and a grey one
+        float band = smoothstep(u_dial.z - 26.0, u_dial.z - 24.5, r) * (1.0 - smoothstep(u_dial.z - 1.5, u_dial.z, r));
+        c = put(c, mix(vec3(0.07, 0.075, 0.08), vec3(0.24, 0.25, 0.27), (r - u_dial.z + 26.0) / 26.0), band * inArc);
+        c = put(c, GREY, cov(abs(r - u_dial.z + 26.0) - 0.8) * inArc);
         c = put(c, rim, cov(abs(r - u_dial.z) - 1.5) * inArc);
         float dv = right ? u_oil : u_fuel;
-        float mk = cov(abs(df - dv) * arcLen - 3.0) * cov(abs(r - u_dial.z + 12.0) - 12.0);
+        float mk = cov(abs(df - dv) * arcLen - 3.0) * cov(abs(r - u_dial.z + 13.0) - 13.0);
         c = put(c, RED, mk);
         for (int j = 0; j < 3; j++) {
             float tf = float(j) * 0.5;
@@ -1539,7 +1562,7 @@ void main() {
     }
 
     // the line under the speed (left) and under the gear (right), fading in from the outer end
-    if (q.x >= u_line.x && q.x <= u_line.y) {
+    if (q.x >= u_line.x && q.x <= u_line.y && (!right || u_lineR > 0.5)) {
         float x0 = u_line.x + 56.0;
         if (q.x < x0 - 8.0) {
             // the double dash at the outer end
@@ -1554,6 +1577,27 @@ void main() {
     if (q.x >= b0.x && q.x <= u_line.w) {
         float fade = 1.0 - smoothstep(u_line.w - 140.0, u_line.w, q.x);
         c = put(c, GREY, cov(abs(q.y - b0.y) - 1.0) * fade);
+    }
+
+    // the tyre block, as BMW's: a cross between the four corners, the car in green in its middle, a tyre icon on top
+    if (u_tyre.z > 0.5) {
+        vec2 t = p - u_tyre.xy;
+        float cross = min(min(segd(t, vec2(4.0, -69.0), vec2(4.0, -32.0)), segd(t, vec2(-1.0, 38.0), vec2(-1.0, 80.0))),
+                          min(segd(t, vec2(-77.0, 1.0), vec2(-22.0, 1.0)), segd(t, vec2(28.0, 0.0), vec2(80.0, 0.0))));
+        c = put(c, WHITE, cov(cross - 1.1));
+        // the car: a rounded body with four wheels
+        vec2 bq = abs(t) - vec2(6.0, 14.0);
+        float body = length(max(bq, 0.0)) + min(max(bq.x, bq.y), 0.0) - 4.0;
+        vec3 GREEN = vec3(0.24, 0.86, 0.29);
+        c = put(c, GREEN, cov(abs(body) - 1.2));
+        vec2 wq = abs(abs(t) - vec2(11.0, 9.0)) - vec2(1.5, 3.5);
+        c = put(c, GREEN, cov(length(max(wq, 0.0)) + min(max(wq.x, wq.y), 0.0) - 0.5));
+        // the icon: a tyre with its tread
+        vec2 ic = p - vec2(u_tyre.w, u_tyre.y - 131.0);
+        float ir = length(ic);
+        c = put(c, WHITE, cov(abs(ir - 12.0) - 1.6));
+        float spoke = abs(sin(atan(ic.y, ic.x) * 2.5));
+        c = put(c, WHITE, cov(abs(ir - 6.0) - 1.4) * smoothstep(0.55, 0.75, spoke));
     }
 
     float alpha = 1.0;

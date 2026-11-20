@@ -338,6 +338,55 @@ const TILE_MAX = 14;       // half a flash: red, then the normal colour
 // widgets that show the shift cue (the reaction time is learned only while one of them is drawn)
 const MVIEW_RPM = 8000;            // the M view theme's rev scale: 0..8
 const MVIEW_SPEED = { us: 200, metric: 330 };
+const MVIEW_STEP = { us: 20, metric: 30, rpm: 1000 };   // the value between two numbered marks
+/**
+ * The geometry of an mview scale (Strada), worked out once per layout: the line's arc length at each point, and for
+ * each numbered mark of "marks" ({ metric, us, rpm }: [x0, y0, x1, y1] from the line in towards the number, left frame)
+ * the arc length where it meets the line. BMW's scale is not even along the line, so a value goes to the arc length
+ * between its two marks.
+ */
+function mviewGeo(w) {
+    if (w._geo) return w._geo;
+    const P = w.path.slice(0, 32).map((p) => [p[0] - w.x, p[1] - w.y]), cum = [0];
+    for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+    const arcOf = (x, y) => {      // the arc length of the line's point nearest (x, y)
+        let best = Infinity, at = 0;
+        for (let i = 0; i < P.length - 1; i++) {
+            const [ax, ay] = P[i], bx = P[i + 1][0] - ax, by = P[i + 1][1] - ay, L2 = bx * bx + by * by || 1;
+            const h = Math.max(0, Math.min(1, ((x - ax) * bx + (y - ay) * by) / L2));
+            const d = Math.hypot(x - ax - bx * h, y - ay - by * h);
+            if (d < best) { best = d; at = cum[i] + h * Math.sqrt(L2); }
+        }
+        return at;
+    };
+    const pointAt = (s) => {
+        for (let i = 0; i < P.length - 1; i++) {
+            if (s <= cum[i + 1] || i === P.length - 2) {
+                const h = (s - cum[i]) / ((cum[i + 1] - cum[i]) || 1);
+                return [P[i][0] + (P[i + 1][0] - P[i][0]) * h, P[i][1] + (P[i + 1][1] - P[i][1]) * h];
+            }
+        }
+        return P[0];
+    };
+    const local = (m) => (m || []).slice(0, 12).map((g) => [g[0] - w.x, g[1] - w.y, g[2] - w.x, g[3] - w.y]);
+    const marks = { metric: local(w.marks.metric), us: local(w.marks.us), rpm: local(w.marks.rpm) };
+    const arcs = {};
+    Object.keys(marks).forEach((k) => { arcs[k] = marks[k].map((g) => arcOf(g[0], g[1])); });
+    w._geo = { P, cum, total: cum[cum.length - 1], pointAt, marks, arcs, center: [w.center[0] - w.x, w.center[1] - w.y] };
+    return w._geo;
+}
+/** The arc length of value v on the scale k (metric, us, rpm), between its numbered marks; the first mark's below 0. */
+function mviewArc(geo, k, v) {
+    const a = geo.arcs[k], step = MVIEW_STEP[k];
+    if (!isNum(v) || !a.length) return a.length ? a[0] : 0;
+    const t = Math.max(0, Math.min(a.length - 1, v / step)), i = Math.min(a.length - 2, Math.floor(t));
+    return a[i] + (a[i + 1] - a[i]) * (t - i);
+}
+/** The needle at arc length s: from just outside the line in towards the scale's centre, len px. */
+function mviewNeedle(geo, s, len) {
+    const [x, y] = geo.pointAt(s), dx = geo.center[0] - x, dy = geo.center[1] - y, L = Math.hypot(dx, dy) || 1;
+    return [x - dx / L * 6, y - dy / L * 6, x + dx / L * len, y + dy / L * len].map((n) => Math.round(n * 2) / 2);
+}
 const VDASH_RPM = 8000;            // the Vector theme's rev counter: 0..8
 const MEDIA_IF = 'de.bmw.infotainment.hmi.hmimediastate.HmiMediaState';   // the head unit's now playing (front)
 const MEDIA_TYPES = { 1: 'ARTIST', 2: 'ALBUM', 3: 'TITLE' };
@@ -2123,24 +2172,29 @@ class HudApp {
             c.uniform(ref, 'u_road', w.road ? [w.road[0], w.road[1], 0, 1] : [0, 1, 0, 0]);
         } else if (w.type === 'mview') {
             // the left scale's line: points (layer px) and the arc length at each (the shader mirrors it for the right)
-            const pts = [], cum = [];
-            let acc = 0;
-            w.path.slice(0, 32).forEach((pt, i) => {
-                if (i) acc += Math.hypot(pt[0] - w.path[i - 1][0], pt[1] - w.path[i - 1][1]);
-                pts.push(pt[0] - w.x, pt[1] - w.y); cum.push(acc);
-            });
+            const geo = mviewGeo(w), pts = [], cum = geo.cum.slice();
+            geo.P.forEach((pt) => pts.push(pt[0], pt[1]));
             while (pts.length < 64) pts.push(0);
             while (cum.length < 32) cum.push(0);
+            const us = this.setting('units') === 'us', sk = us ? 'us' : 'metric';
+            const pad = (a, n) => { const o = a.slice(); while (o.length < n) o.push(0); return o; };
+            const flat = (m) => pad([].concat.apply([], m), 48);
             c.uniform(ref, 'u_size', [w.w, w.h]);
             c.uniform(ref, 'u_path', pts, { type: 'vec2' });
             c.uniform(ref, 'u_cum', cum, { type: 'float' });
-            c.uniform(ref, 'u_n', [Math.min(32, w.path.length)]);
-            c.uniform(ref, 'u_scale', [w.scale[0], w.scale[1], 0, acc]);
-            const us = this.setting('units') === 'us';
-            c.uniform(ref, 'u_ticks', us ? [10, 2, 8, 2] : [11, 3, 8, 2]);   // a mark every 10 mph / 10 km/h; every 500 rpm
-            const [redFrom, orange] = this._redMarks(MVIEW_RPM);
-            c.uniform(ref, 'u_redFrom', [redFrom]);
-            c.uniform(ref, 'u_orange', [orange]);
+            c.uniform(ref, 'u_n', [geo.P.length]);
+            const A = geo.arcs[sk], R = geo.arcs.rpm;
+            c.uniform(ref, 'u_scale', [A[0], A[A.length - 1], R[0], R[R.length - 1]]);
+            c.uniform(ref, 'u_total', [geo.total]);
+            // numbered marks - 1 intervals, short marks every 10 mph / 10 km/h (us: 2 per 20) and every 500 rpm
+            c.uniform(ref, 'u_ticks', [A.length - 1, us ? 2 : 3, R.length - 1, 2]);
+            c.uniform(ref, 'u_mk', pad(A, 12), { type: 'float' });
+            c.uniform(ref, 'u_mkR', pad(R, 12), { type: 'float' });
+            c.uniform(ref, 'u_tk', flat(geo.marks[sk]), { type: 'vec4' });
+            c.uniform(ref, 'u_tkR', flat(geo.marks.rpm), { type: 'vec4' });
+            c.uniform(ref, 'u_redS', [mviewArc(geo, 'rpm', Math.min(this.setting('redline'), MVIEW_RPM - 500))]);
+            c.uniform(ref, 'u_lineR', [w.lineRight === false ? 0 : 1]);
+            c.uniform(ref, 'u_tyre', w.tyres ? [w.tyres[0] - w.x, w.tyres[1] - w.y, 1, w.tyres[2] - w.x] : [0, 0, 0, 0]);
             c.uniform(ref, 'u_dial', [w.dial[0] - w.x, w.dial[1] - w.y, w.dial[2], 0]);
             c.uniform(ref, 'u_dialAng', w.dialAng);
             c.uniform(ref, 'u_line', [w.line[0] - w.x, w.line[1] - w.x, w.line[2] - w.y, w.line[3] - w.x]);
@@ -2752,16 +2806,21 @@ class HudApp {
             x.c.uniform(x.ref, 'u_vinyl', x.vinyl.concat([on]));
             x.c.uniform(x.ref, 'u_prog', x.prog.concat([pv]));
         } else if (w.type === 'mview') {
-            const us = this.setting('units') === 'us';
+            const us = this.setting('units') === 'us', geo = mviewGeo(w);
             const sp = this._raw('speed'), rpm = this._raw('rpm'), fuel = this._raw('fuel'), oil = this._raw('oil');
             const q = (v) => Math.round(Math.min(1, Math.max(0, v)) * 1000) / 1000;
-            const vals = [q(isNum(sp) ? (us ? sp * 0.621371 : sp) / MVIEW_SPEED[us ? 'us' : 'metric'] : 0),
-                q(isNum(rpm) ? rpm / MVIEW_RPM : 0), q(isNum(fuel) ? fuel : 0), q(isNum(oil) ? (oil - 50) / 100 : 0)];
+            const half = (v) => Math.round(v * 2) / 2;
+            const sS = half(mviewArc(geo, us ? 'us' : 'metric', isNum(sp) ? (us ? sp * 0.621371 : sp) : 0));
+            const sR = half(mviewArc(geo, 'rpm', isNum(rpm) ? Math.min(rpm, MVIEW_RPM) : 0));
+            const vals = [sS, sR, q(isNum(fuel) ? fuel : 0), q(isNum(oil) ? (oil - 50) / 100 : 0)];
             const key = vals.join('|');
             if (!force && key === x.last) return;
             x.last = key;
-            x.c.uniform(x.ref, 'u_speed', [vals[0]]);
-            x.c.uniform(x.ref, 'u_rpm', [vals[1]]);
+            const len = w.needle || 70;
+            x.c.uniform(x.ref, 'u_speed', [sS]);
+            x.c.uniform(x.ref, 'u_rpm', [sR]);
+            x.c.uniform(x.ref, 'u_ndl', mviewNeedle(geo, sS, len));
+            x.c.uniform(x.ref, 'u_ndlR', mviewNeedle(geo, sR, len));
             x.c.uniform(x.ref, 'u_fuel', [vals[2]]);
             x.c.uniform(x.ref, 'u_oil', [vals[3]]);
         } else if (w.type === 'mdash') {

@@ -65,6 +65,11 @@ CLUSTER_FONTS = [
     ('m_label', 'Orbitron[wght].ttf', 20, UPPER + DIGITS + ' -/%°', 0, 'Bold'),   # digits, / % °: the M readout slots' names and units
     ('m_tiny', 'Barlow-Medium.ttf', 26, LOWER + DIGITS + 'CF./ -°'),
     ('m_badge', 'Barlow-Medium.ttf', 26, UPPER + LOWER + DIGITS + ' -'),
+    # Strada / Corsa: BMW's squared numbers, narrower than Michroma (Orbitron, SIL OFL; its 0 is the plain O)
+    ('k_scale', 'Orbitron[wght].ttf', 28, DIGITS, 0, 'Bold', {'0': 'O'}),
+    ('k_speed', 'Orbitron[wght].ttf', 72, DIGITS + '-', 3, 'Black', {'0': 'O'}),
+    ('k_val', 'Orbitron[wght].ttf', 26, DIGITS + ':+-.', 0, 'Bold', {'0': 'O'}),
+    ('k_gl', 'Orbitron[wght].ttf', 22, DIGITS + '/', 0, 'Bold', {'0': 'O'}),
     # Sport: BMW Live Cockpit style, the wide numbers in Michroma like BMW's own
     ('s_scale', 'Michroma-Regular.ttf', 27, DIGITS, 1),
     ('s_speed', 'Michroma-Regular.ttf', 74, DIGITS + '-', 3),
