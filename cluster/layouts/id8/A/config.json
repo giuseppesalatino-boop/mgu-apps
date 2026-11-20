@@ -857,7 +857,20 @@
           2
         ]
       ],
-      "_about_wing": "The slanted wing over the speed cut-out (and its mirror over the gear one): parallel to the upper legs, x = -0.593 y + 495.7 to + 552.5, from the top edge to y 344, 5 px apart from the main panel."
+      "_about_wing": "The slanted wing over the speed cut-out (and its mirror over the gear one): parallel to the upper legs, x = -0.593 y + 495.7 to + 552.5, from the top edge to y 344, 5 px apart from the main panel.",
+      "gear_cut": [
+        [
+          0.70559,
+          0.41389,
+          3
+        ],
+        [
+          0.67676,
+          0.53889,
+          3
+        ]
+      ],
+      "_about_gear": "The one part that is not symmetric: the gear cut-out's inner side slants the same way as the speed cut-out's (x = -0.615 y + 1538, from (1355, 298) down to (1299, 388)), not as its mirror. 'gear_cut' replaces the two mirrored vertices."
     }
   },
   "engine": "petrol",
