@@ -236,7 +236,11 @@ DIGITS = {
     '9': [_T, (0, 0, _L, 13.5), _M, (_R, 0, 29, 22), _B],
 }
 DIGITS['/'] = [('quad', (12, 0), (17, 0), (5, 22), (0, 22))]
-DIGIT_W = {'1': 18, '/': 17}
+DIGITS[':'] = [(0, 4.5, 8, 9.5), (0, 13.5, 8, 18.5)]
+DIGITS['.'] = [(0, 17, 8, 22)]
+DIGITS['+'] = [(7, 4.5, 13, 17.5), (0, 8, 20, 14)]
+DIGITS['-'] = [(0, 8, 20, 14)]
+DIGIT_W = {'1': 18, '/': 17, ':': 8, '.': 8, '+': 20, '-': 20}
 
 
 def big_glyph(ch, w, h, tb, tu):
@@ -611,13 +615,36 @@ def feet_glow(img, cfg):
 
 
 def fit_view(img, cfg):
-    """The finished layer scaled about the view's centre (config 'view'), so the layout stays inside the car's
-    visible area (config 'visible')."""
+    """The finished layer scaled uniformly (proportions unchanged) so the layout stays inside the car's visible area
+    (config 'visible'): 'auto' finds the largest scale that keeps every drawn pixel inside it, centred in it."""
     v = cfg.get('view')
-    if not v or v.get('scale', 1) == 1:
+    if not v:
         return img
     W, H = cfg['grid']
-    k, cx, cy = v['scale'], v['cx'] * W, v['cy'] * H
+    if v.get('auto'):
+        a = np.asarray(img)[..., :3].max(-1) > 12
+        ys, xs = np.nonzero(a)
+        bx0, bx1, by0, by1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+        vb = cfg['visible']['box']
+        vx0, vy0, vx1, vy1 = vb[0] * W, vb[1] * H, vb[2] * W, vb[3] * H
+        vis = Image.new('L', (W, H), 0)
+        ImageDraw.Draw(vis).rounded_rectangle([vx0, vy0, vx1, vy1], radius=cfg['visible'].get('corner', 0), fill=255)
+        vis = np.asarray(vis) > 0
+        k = min((vx1 - vx0) / (bx1 - bx0), (vy1 - vy0) / (by1 - by0)) * v.get('margin', 1.0)
+        while True:                                            # shrink until no pixel lands outside (the round corners)
+            tx, ty = (vx0 + vx1) / 2, (vy0 + vy1) / 2
+            cx, cy = (tx - k * (bx0 + bx1) / 2) / (1 - k), (ty - k * (by0 + by1) / 2) / (1 - k)
+            out = _scale(img, k, cx, cy, W, H)
+            if not ((np.asarray(out)[..., :3].max(-1) > 12) & ~vis).any() or k < 0.5:
+                v['_fit'] = {'scale': round(k, 4), 'cx': round(cx, 1), 'cy': round(cy, 1)}
+                return out
+            k -= 0.005
+    if v.get('scale', 1) == 1:
+        return img
+    return _scale(img, v['scale'], v['cx'] * W, v['cy'] * H, W, H)
+
+
+def _scale(img, k, cx, cy, W, H):
     big = img.resize((W * 2, H * 2), Image.LANCZOS)          # resample from a larger copy, then down
     out = big.transform((W, H), Image.AFFINE, (2 / k, 0, 2 * (cx - cx / k), 0, 2 / k, 2 * (cy - cy / k)),
                         resample=Image.BICUBIC, fillcolor=(0, 0, 0, 255))
@@ -664,6 +691,26 @@ def build_static(cfg):
     draw_labels(img, cfg)
     draw_gauge_labels(img, cfg)
     W, H = cfg['grid']
+    for el in cfg['elements'].values():                       # the bottom row (live values sampled)
+        rw = el.get('row')
+        if not rw:
+            continue
+        for it in rw['items']:
+            draw_number(img, it['sample'], it['at'][0] * W, it['at'][1] * H, rw['h'], 32.5, rw['color'],
+                        align='left', sx=rw['sx'], gap=rw['gap'])
+        for ic in rw.get('icons', []):
+            x0, y0, w, h = ic['at'][0] * W, ic['at'][1] * H, ic['size'][0], ic['size'][1]
+            if ic.get('mirror'):                               # the arrow on the left, as in the bottom row
+                tmp = Image.new('RGBA', (int(w) + 8, int(h) + 8), (0, 0, 0, 0))
+                draw_pump(tmp, 4, 4, w, h, rw['color'])
+                img.alpha_composite(tmp.transpose(Image.FLIP_LEFT_RIGHT), (int(round(x0)) - 4, int(round(y0)) - 4))
+            else:
+                draw_pump(img, x0, y0, w, h, rw['color'])
+        imperial = cfg.get('units') == 'imperial'
+        for lb in rw.get('labels', []):
+            if imperial and (lb.get('text_imperial') or lb.get('text_mph')):
+                lb = dict(lb, text=lb.get('text_imperial') or lb.get('text_mph'), fit_text=lb['text'])
+            draw_labels(img, {'grid': cfg['grid'], 'elements': {'t': {'label': lb}}})
     for el in cfg['elements'].values():                       # the live readouts, sampled with the photo's values
         dg = el.get('digits')
         if dg and el.get('sample'):

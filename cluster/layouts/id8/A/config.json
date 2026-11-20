@@ -1186,6 +1186,95 @@
         44,
         60
       ]
+    },
+    "bottom_row": {
+      "_about": "The bottom row, as on the reference photo: the clock left, the range with the pump icon, the outside temperature right. Live values (sampled here with the photo's), in the scale's digits narrowed to the photo's width (sx 0.7, 3.5 px apart, 28 px tall), white; units in the label font. Positions are the photo's left edges and centre heights.",
+      "row": {
+        "h": 28,
+        "sx": 0.7,
+        "gap": 3.5,
+        "color": [
+          230,
+          231,
+          236
+        ],
+        "items": [
+          {
+            "id": "clock",
+            "sample": "19:03",
+            "at": [
+              0.03594,
+              0.96736
+            ]
+          },
+          {
+            "id": "range",
+            "sample": "400",
+            "at": [
+              0.18333,
+              0.96528
+            ]
+          },
+          {
+            "id": "ambient",
+            "sample": "+21.0",
+            "at": [
+              0.8974,
+              0.96736
+            ]
+          }
+        ],
+        "icons": [
+          {
+            "kind": "pump",
+            "at": [
+              0.15833,
+              0.94722
+            ],
+            "size": [
+              37,
+              29
+            ],
+            "mirror": true
+          }
+        ],
+        "labels": [
+          {
+            "text": "km",
+            "text_mph": "mi",
+            "font": "BarlowSemiCondensed-Medium.ttf",
+            "box": [
+              0.23281,
+              0.95278,
+              0.2526,
+              0.98333
+            ],
+            "color": [
+              230,
+              231,
+              236
+            ],
+            "bold": 0.012
+          },
+          {
+            "text": "\u00b0C",
+            "text_imperial": "\u00b0F",
+            "font": "BarlowSemiCondensed-Medium.ttf",
+            "box": [
+              0.95469,
+              0.95556,
+              0.96979,
+              0.9875
+            ],
+            "color": [
+              230,
+              231,
+              236
+            ],
+            "bold": 0.012
+          }
+        ]
+      }
     }
   },
   "engine": "petrol",
@@ -1203,9 +1292,8 @@
     "corner": 90
   },
   "view": {
-    "_about": "The whole layout scaled uniformly (proportions unchanged) by 'scale' about the fixed point (cx, cy), chosen so the drawing (x 66..1803, y 89..680 at the reference's size) lands centred inside 'visible'. Applied to the finished static layer and to every dynamic element.",
-    "scale": 0.835,
-    "cx": 0.56721,
-    "cy": 0.31096
+    "_about": "The whole layout scaled uniformly (proportions unchanged) to fit 'visible': 'auto' computes the largest scale that keeps every drawn pixel inside it and centres the drawing in it.",
+    "auto": true,
+    "margin": 0.995
   }
 }
