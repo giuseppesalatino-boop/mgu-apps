@@ -800,12 +800,12 @@
           0
         ],
         [
-          0.24183,
+          0.2417,
           0.21944,
-          24
+          10
         ],
         [
-          0.19859,
+          0.19905,
           0.41389,
           3
         ],
@@ -837,27 +837,27 @@
       ],
       "wing_half": [
         [
-          0.20907,
+          0.20776,
           0.22083,
-          8
+          14
         ],
         [
-          0.23865,
+          0.23887,
           0.22083,
           2
         ],
         [
-          0.18151,
+          0.17865,
           0.47778,
           2
         ],
         [
-          0.15193,
+          0.15159,
           0.47778,
           2
         ]
       ],
-      "_about_wing": "The slanted wing over the speed cut-out (and its mirror over the gear one): parallel to the upper legs, x = -0.593 y + 495.7 to + 552.5, from the top edge to y 344, 5 px apart from the main panel.",
+      "_about_wing": "The left wing, not the panel's parallel: its left edge x = -0.583 y + 491.6, its right edge steeper, x = -0.625 y + 558, so the gap to the panel (x = -0.585 y + 556.5) opens from ~5 px at the top to ~10 at the bottom; top y 159, bottom y 344, the big round on its outer top corner. Measured row by row on the photo's blue mask.",
       "gear_cut": [
         [
           0.70559,
@@ -981,7 +981,47 @@
             ]
           ]
         ]
-      }
+      },
+      "top_right": [
+        [
+          0.80312,
+          0.41389,
+          3
+        ],
+        [
+          0.81771,
+          0.35,
+          12
+        ],
+        [
+          0.79047,
+          0.21944,
+          24
+        ]
+      ],
+      "wing_right": [
+        [
+          0.82031,
+          0.35833,
+          2
+        ],
+        [
+          0.84479,
+          0.47639,
+          3
+        ],
+        [
+          0.81719,
+          0.47639,
+          3
+        ],
+        [
+          0.80625,
+          0.41389,
+          2
+        ]
+      ],
+      "_about_right": "Not symmetric at the top right either: the panel's right edge runs on the wing's mirrored line (x = 1521 + 0.545 (y - 164)) down to (1570, 252) and turns in to the gear cut-out, so there is no wing over it at the top; the right wing is a small chevron below (258..343). Measured on the photo's blue mask. Top-left: the panel's corner is nearly sharp, the wing's outer corner carries the big round."
     },
     "speed": {
       "_about": "The speed in the speed cut-out: BMW's big squared digits (tools/gen_static.py big_glyph: 76 x 59 px, bars 10, uprights 22, measured on the photo's 57), right edge at x 540, top at y 315, 10 px apart; always full size: three digits grow to the left over the cut-out's slanted side. Dynamic: drawn by the live layer, sampled here with the photo's value.",

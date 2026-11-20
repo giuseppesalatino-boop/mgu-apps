@@ -87,12 +87,15 @@ def panel_shapes(cfg):
         if 'gear_cut' in el:                                  # the gear cut-out is not the speed one's mirror
             gc = to_px(cfg, el['gear_cut'])
             right[2], right[3] = gc[1], gc[0]                 # its inner side: bottom vertex, then top vertex
+        if 'top_right' in el:                                 # the top right is not the top left's mirror
+            right = right[:4] + to_px(cfg, el['top_right'])
         full = half + right
         out[name] = fillet_closed(full)
         if 'wing_half' in el:
             wing = to_px(cfg, el['wing_half'])
             out[name + '.wing_l'] = fillet_closed(wing)
-            out[name + '.wing_r'] = fillet_closed([(W - x, y, r) for x, y, r in reversed(wing)])
+            wr = to_px(cfg, el['wing_right']) if 'wing_right' in el else [(W - x, y, r) for x, y, r in reversed(wing)]
+            out[name + '.wing_r'] = fillet_closed(wr)
     return out
 
 
