@@ -15,7 +15,7 @@ import math
 import os
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SS = 4                      # supersampling: drawn 4x larger, scaled down
@@ -221,6 +221,36 @@ def draw_numbers(img, cfg):
             draw_number(img, str(v), x_on(out, y) - n['gap'], y, n['h'], n['advance'], n['color'])
 
 
+FONTS = os.path.join(ROOT, 'tools', 'fonts-src')
+
+
+def draw_labels(img, cfg, ss=8):
+    """Text labels: the text's ink is scaled to the box's height (box: normalized x0, y0, x1, y1 measured on the photo),
+    left-aligned; for the photo's own text its width matches the box too."""
+    W, H = cfg['grid']
+    for el in cfg['elements'].values():
+        lb = el.get('label')
+        if not lb:
+            continue
+        text = lb['text']
+        src = cfg['elements'].get(lb.get('scale_of', ''), {}).get('numbers', {})
+        if str(src.get('scale', '')).endswith('mph') and lb.get('text_mph'):
+            text = lb['text_mph']
+        x0, y0, x1, y1 = lb['box'][0] * W, lb['box'][1] * H, lb['box'][2] * W, lb['box'][3] * H
+        font = ImageFont.truetype(os.path.join(FONTS, lb['font']), 200)
+        sw = int(round(200 * lb.get('bold', 0)))                # extra weight, as a fraction of the font size
+        l, t, r, b = font.getbbox(lb['text'], stroke_width=sw)  # the photo's text sets the scale
+        k = (y1 - y0) / (b - t)
+        l2, t2, r2, b2 = font.getbbox(text, stroke_width=sw)
+        m = Image.new('L', (r2 - l2 + 8, b - t + 8), 0)
+        ImageDraw.Draw(m).text((4 - l2, 4 - t), text, font=font, fill=255, stroke_width=sw, stroke_fill=255)
+        m = m.resize((max(1, round(m.width * k)), max(1, round(m.height * k))), Image.LANCZOS)
+        kx = 1.0
+        layer = Image.new('RGBA', m.size, tuple(lb['color']) + (0,))
+        layer.putalpha(m)
+        img.alpha_composite(layer, (int(round(x0 - 4 * k * kx)), int(round(y0 - 4 * k))))
+
+
 def build_static(cfg):
     """The static layer, RGBA at grid size: each bracket filled zone by zone (band, gap, stripe), then its lines and marks."""
     W, H = cfg['grid']
@@ -246,6 +276,7 @@ def build_static(cfg):
         if el.get('colors') and 'band' in el:
             img = bevel(img, cfg, el)
     draw_numbers(img, cfg)
+    draw_labels(img, cfg)
     return img
 
 

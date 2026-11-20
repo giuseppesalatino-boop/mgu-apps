@@ -236,6 +236,27 @@
           239
         ]
       }
+    },
+    "label_speed_unit": {
+      "_about": "The speed scale's unit over the bracket: the ink of the text fits the photo's box (x 306-364, y 90-111: 'k' and 'h' tops to the baseline), left-aligned; with an mph scale the text is 'mph' at the same height. Barlow Semi Condensed Medium, a touch heavier ('bold') (SIL OFL, tools/fonts-src).",
+      "label": {
+        "text": "km/h",
+        "text_mph": "mph",
+        "font": "BarlowSemiCondensed-Medium.ttf",
+        "box": [
+          0.15937,
+          0.125,
+          0.1901,
+          0.15417
+        ],
+        "color": [
+          186,
+          194,
+          219
+        ],
+        "scale_of": "bracket_left",
+        "bold": 0.012
+      }
     }
   }
 }
