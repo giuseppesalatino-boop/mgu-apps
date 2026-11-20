@@ -1275,6 +1275,87 @@
           }
         ]
       }
+    },
+    "shift_lights": {
+      "_about": "Shift lights (not on BMW's own A layout; as on its other M layouts): a bar of 'n' slanted segments on each side over the top line, between the speed unit and the panel's end (the right bar its mirror, clear of the rev unit); they fill from the outer ends towards the middle, yellow then red ('colors', from the outer end), from 'span' rpm below the shift point (the redline less 'before') up to it; at the shift point all of them turn 'flash' red. Unlit grey.",
+      "x": [
+        0.24479,
+        0.34375
+      ],
+      "y": [
+        0.13056,
+        0.15278
+      ],
+      "n": 10,
+      "gap": 3,
+      "slant": 4,
+      "span": {
+        "petrol": 3000,
+        "diesel": 1700
+      },
+      "before": 300,
+      "off": [
+        52,
+        54,
+        60
+      ],
+      "flash": [
+        240,
+        36,
+        52
+      ],
+      "colors": [
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          240,
+          36,
+          52
+        ],
+        [
+          240,
+          36,
+          52
+        ],
+        [
+          240,
+          36,
+          52
+        ]
+      ]
     }
   },
   "engine": "petrol",

@@ -683,6 +683,7 @@ def build_static(cfg):
     d = ImageDraw.Draw(img)
     draw_gauges(d, cfg, sc)
     img = img.resize((W, H), Image.LANCZOS)
+    img = draw_shift_lights(img, cfg)                          # unlit; the live layer lights them
     for el in cfg['elements'].values():
         if el.get('colors') and 'band' in el:
             img = bevel(img, cfg, el)
@@ -882,7 +883,7 @@ def draw_zone(img, cfg, el, y_from, y_to, colour, off=5.5, width=4.2, cuts=()):
     along = np.clip(np.minimum(Y - ya, yb - Y) / 2 + 0.5, 0, 1)            # soft, rounded-looking ends
     core = across * along * (G > 0.5)
     # the line never touches a mark: it stops 'clear' px before every one and goes on past it
-    clear = 3.0
+    clear = 2.0
     for tx0, ty0, tx1, ty1 in tick_rects(cfg, el):
         dx = np.maximum(np.maximum(tx0 - X, X - tx1), 0)
         dy = np.maximum(np.maximum(ty0 - Y, Y - ty1), 0)
@@ -917,6 +918,41 @@ def draw_gauge_level(img, cfg, el, level, colour=(236, 238, 246)):
     return img
 
 
+def shift_segments(cfg):
+    """The shift lights' segments as polygons (grid px at the reference's size): the left bar from its outer end in,
+    the right bar its mirror (also from its outer end in), so they fill towards the middle."""
+    sl = cfg['elements'].get('shift_lights')
+    if not sl:
+        return [], []
+    W, H = cfg['grid']
+    x0, x1, y0, y1 = sl['x'][0] * W, sl['x'][1] * W, sl['y'][0] * H, sl['y'][1] * H
+    n, gap, sl_ = sl['n'], sl['gap'], sl['slant']
+    w = (x1 - x0 - gap * (n - 1)) / n
+    left = []
+    for i in range(n):
+        a = x0 + i * (w + gap)
+        left.append([(a + sl_, y0), (a + w + sl_, y0), (a + w, y1), (a, y1)])
+    right = [[(W - x, y) for x, y in p] for p in left]
+    return left, right
+
+
+def draw_shift_lights(img, cfg, lit=0, flash=False):
+    """The shift lights: every segment unlit (static), the first 'lit' of each bar from the outer end lit; 'flash' at
+    the shift point lights them all in the flash colour."""
+    sl = cfg['elements'].get('shift_lights')
+    if not sl:
+        return img
+    left, right = shift_segments(cfg)
+    big = Image.new('RGBA', (img.size[0] * 4, img.size[1] * 4), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big)
+    for bar in (left, right):
+        for i, p in enumerate(bar):
+            c = sl['flash'] if flash else (sl['colors'][i] if i < lit else sl['off'])
+            d.polygon([(x * 4, y * 4) for x, y in p], fill=tuple(c) + (255,))
+    img.alpha_composite(big.resize(img.size, Image.LANCZOS))
+    return img
+
+
 def draw_dynamic(img, cfg, tel):
     """The live layer over the static one (both at the reference's size): speed and revs fills with their bars, the
     rev zones for the oil temperature, the fuel and temperature levels, the big speed and gear."""
@@ -937,8 +973,14 @@ def draw_dynamic(img, cfg, tel):
               else R['ticks']['scales'][rz['scale']]) * 1000
     for colour, a, b in zones:
         b = b or top
-        cuts = [value_y(R, rz['scale'], r / 1000) for r in range(int(a) + 500, int(b), 1000) if r % 1000 == 500]
-        img = draw_zone(img, cfg, R, value_y(R, rz['scale'], a / 1000), value_y(R, rz['scale'], b / 1000), colour, cuts=cuts)
+        img = draw_zone(img, cfg, R, value_y(R, rz['scale'], a / 1000), value_y(R, rz['scale'], b / 1000), colour)
+    # the shift lights: from 'from_rpm' below the shift point (the redline less 'before') up to it
+    sl = E.get('shift_lights')
+    if sl:
+        shift = rz['red'] - sl.get('before', 300)
+        start = shift - sl['span'][eng]
+        lit = int(np.clip((tel['rpm'] - start) / (shift - start), 0, 1) * sl['n'] + 1e-6)
+        img = draw_shift_lights(img, cfg, lit, tel['rpm'] >= shift)
     # the fills
     img = draw_bracket_value(img, cfg, L, value_y(L, L['numbers']['scale'], tel['speed']), 'blue')
     img = draw_bracket_value(img, cfg, R, value_y(R, rz['scale'], tel['rpm'] / 1000), 'red')
