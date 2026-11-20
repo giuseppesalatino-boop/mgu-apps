@@ -236,6 +236,64 @@ DIGITS['/'] = [('quad', (12, 0), (17, 0), (5, 22), (0, 22))]
 DIGIT_W = {'1': 18, '/': 17}
 
 
+def big_glyph(ch, w, h, tb, tu):
+    """BMW's big squared glyphs (speed and gear), built from the cell w x h, bar thickness tb and upright thickness tu
+    (measured on the photo's 57 and D): parts as in DIGITS ([x0, y0, x1, y1] or ('quad', ...) or ('round', ...))."""
+    m0, m1 = h * 0.41, h * 0.41 + tb                       # the middle bar
+    T, M, B = (0, 0, w, tb), (0, m0, w, m1), (0, h - tb, w, h)
+    L, R = (0, 0, tu, h), (w - tu, 0, w, h)
+    up = lambda y0, y1, right=False: ((w - tu, y0, w, y1) if right else (0, y0, tu, y1))
+    g = {
+        '0': [T, B, L, R], '8': [T, M, B, L, R],
+        '1': [(w * 0.35, 0, w * 0.35 + tu, h), (w * 0.12, 0, w * 0.35 + tu, tb)],
+        '2': [T, M, B, up(0, m1, True), up(m0, h)], '3': [T, (w * 0.25, m0, w, m1), B, R],
+        '4': [('quad', (w * 0.3, 0), (w * 0.3 + tu, 0), (tu, m1), (0, m1)), (0, m0 + tb * 0.6, w, m1 + tb * 0.6),
+              (w - tu * 0.85, 0, w, h)],
+        '5': [T, up(0, m1), M, up(m0, h, True), B], '6': [T, L, M, up(m0, h, True), B],
+        '7': [T, ('quad', (w - tu * 1.1, tb), (w, tb), (w * 0.27 + tu * 1.1, h), (w * 0.27, h))],
+        '9': [T, up(0, m1), M, R, B],
+        'P': [L, T, M, up(0, m1, True)], 'R': [L, T, M, up(0, m1, True), ('quad', (w * 0.45, m1), (w * 0.45 + tu, m1), (w, h), (w - tu, h))],
+        'N': [L, R, ('quad', (0, 0), (tu, 0), (w, h), (w - tu, h))], 'S': [('round', 0, 0, w, m1, h * 0.22), ('hole', tu, tb, w + 1, m0, 0),               # rounded, unlike the 5
+              ('round', 0, m0, w, h, h * 0.22), ('hole', -1, m1, w - tu, h - tb, 0)],
+        'M': [L, R, T, ((w - tu * 0.8) / 2, 0, (w + tu * 0.8) / 2, h * 0.7)],
+        'D': [('round', 0, 0, w, h, h * 0.32), (0, 0, w * 0.5, h),                         # square left, rounded right
+              ('hole', tu * 0.75, tb, w - tu * 0.95, h - tb, h * 0.16), ('hole', tu * 0.75, tb, w * 0.5, h - tb, 0)],
+    }
+    return g[ch]
+
+
+def draw_big(img, text, x_right, y_top, d, color, ss=4):
+    """Big glyphs (config 'digits': w, h, bar, upright, gap, letter_w) right-aligned at x_right, top at y_top."""
+    w, h, tb, tu, gap = d['w'], d['h'], d['bar'], d['upright'], d['gap']
+    widths = [d.get('letter_w', w) if ch.isalpha() else (w * 0.62 if ch == '1' else w) for ch in text]
+    total = sum(widths) + gap * (len(text) - 1)
+    k = 1.0
+    if d.get('_min_left') is not None and x_right - total < d['_min_left']:
+        k = (x_right - d['_min_left']) / total               # three digits: scaled down to fit the cut-out
+    x0 = x_right - total * k
+    Wd, Hd = int(total * k) + 6, int(h * k) + 6
+    m = Image.new('L', (Wd * ss, Hd * ss), 0)
+    dr = ImageDraw.Draw(m)
+    x = 3.0
+    for ch, cw in zip(text, widths):
+        for part in big_glyph(ch, cw, h, tb, tu):
+            if part[0] == 'quad':
+                dr.polygon([((x + px_ * k) * ss, (3 + py * k) * ss) for px_, py in part[1:]], fill=255)
+            elif part[0] in ('round', 'hole'):
+                _, a, b, c2, e, r = part
+                dr.rounded_rectangle([(x + a * k) * ss, (3 + b * k) * ss, (x + c2 * k) * ss, (3 + e * k) * ss],
+                                     radius=r * k * ss, fill=255 if part[0] == 'round' else 0)
+            else:
+                a, b, c2, e = part
+                dr.rounded_rectangle([(x + a * k) * ss, (3 + b * k) * ss, (x + c2 * k) * ss - 1, (3 + e * k) * ss - 1],
+                                     radius=2.5 * k * ss, fill=255)
+        x += (cw + gap) * k
+    m = m.resize((Wd, Hd), Image.LANCZOS)
+    layer = Image.new('RGBA', m.size, tuple(color) + (0,))
+    layer.putalpha(m)
+    img.alpha_composite(layer, (int(round(x0)) - 3, int(round(y_top)) - 3))
+
+
 def draw_number(img, text, x_edge, y_mid, h, advance, color, ss=8, align='right', sx=1.0, gap=None):
     """Text of BMW's digits into img (RGBA, grid px), its right (or left) edge at x_edge, centred on y_mid, h px tall;
     sx narrows the glyphs, gap (px) overrides the spacing that advance gives."""
@@ -501,6 +559,12 @@ def build_static(cfg):
     draw_numbers(img, cfg)
     draw_labels(img, cfg)
     draw_gauge_labels(img, cfg)
+    W, H = cfg['grid']
+    for el in cfg['elements'].values():                       # the live readouts, sampled with the photo's values
+        dg = el.get('digits')
+        if dg and el.get('sample'):
+            dg = dict(dg, _min_left=dg['min_left'] * W if 'min_left' in dg else None)
+            draw_big(img, el['sample'], dg['right'] * W, dg['top'] * H, dg, dg['color'])
     return img
 
 
