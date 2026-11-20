@@ -223,6 +223,18 @@
           "inner": 0.4
         },
         "soft": 1.2
+      },
+      "numbers": {
+        "_about": "The scale's numbers, BMW's squared digits drawn as shapes (tools/gen_static.py DIGITS, measured on the photo's 330 / 270 / 150 / 60 / 30: 22 px tall, 29 wide, the 1 18 wide, uprights 6.5 thick, bars 4, digits 32.5 apart), right-aligned 'gap' px left of the outer profile at each mark's height, centred on it. 'scale' picks the scale (ticks.scales).",
+        "scale": "260",
+        "h": 22,
+        "advance": 32.5,
+        "gap": 14.2,
+        "color": [
+          200,
+          223,
+          239
+        ]
       }
     }
   }

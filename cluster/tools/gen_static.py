@@ -165,6 +165,62 @@ def bevel(img, cfg, el):
     return Image.fromarray(arr, 'RGBA')
 
 
+# BMW's squared digits, measured on the reference (px of a 29 x 22 cell; the 1 is 18 wide): every digit is a union of
+# rounded bars [x0, y0, x1, y1], the 7's stroke a slanted quad. Uprights 7 thick, bars 5, middle bar y 8.5..13.5.
+_T, _M, _B = (0, 0, 29, 5), (0, 8.5, 29, 13.5), (0, 17, 29, 22)
+_L, _R = 7, 22
+DIGITS = {
+    '0': [_T, _B, (0, 0, _L, 22), (_R, 0, 29, 22)],
+    '1': [(0, 0, 18, 5), (11, 0, 18, 22)],
+    '2': [_T, _M, _B, (_R, 0, 29, 13.5), (0, 8.5, _L, 22)],
+    '3': [_T, (7, 8.5, 29, 13.5), _B, (_R, 0, 29, 22)],
+    '4': [(0, 0, _L, 13.5), _M, (_R, 0, 29, 22)],
+    '5': [_T, (0, 0, _L, 13.5), _M, (_R, 8.5, 29, 22), _B],
+    '6': [_T, (0, 0, _L, 22), _M, (_R, 8.5, 29, 22), _B],
+    '7': [_T, ('quad', (20.5, 5), (30, 5), (18, 22), (7, 22))],
+    '8': [_T, _M, _B, (0, 0, _L, 22), (_R, 0, 29, 22)],
+    '9': [_T, (0, 0, _L, 13.5), _M, (_R, 0, 29, 22), _B],
+}
+DIGIT_W = {'1': 18}
+
+
+def draw_number(img, text, x_right, y_mid, h, advance, color, ss=8):
+    """Text of BMW's digits into img (RGBA, grid px), right edge at x_right, centred on y_mid, h px tall."""
+    k = h / 22.0
+    widths = [DIGIT_W.get(ch, 29) * k for ch in text]
+    total = sum(widths) + (advance - 29) * k * (len(text) - 1)
+    x0, y0 = x_right - total, y_mid - h / 2
+    W, H = int(total) + 4, int(h) + 4
+    m = Image.new('L', (W * ss, H * ss), 0)
+    d = ImageDraw.Draw(m)
+    x = 2.0
+    for ch, w in zip(text, widths):
+        for part in DIGITS[ch]:
+            if part[0] == 'quad':
+                d.polygon([((x + px_ * k) * ss, (2 + py * k) * ss) for px_, py in part[1:]], fill=255)
+            else:
+                a, b, c, e = part
+                d.rounded_rectangle([(x + a * k) * ss, (2 + b * k) * ss, (x + c * k) * ss - 1, (2 + e * k) * ss - 1],
+                                    radius=1.6 * k * ss, fill=255)
+        x += w + (advance - 29) * k
+    m = m.resize((W, H), Image.LANCZOS)
+    layer = Image.new('RGBA', (W, H), tuple(color) + (0,))
+    layer.putalpha(m)
+    img.alpha_composite(layer, (int(round(x0)) - 2, int(round(y0)) - 2))
+
+
+def draw_numbers(img, cfg):
+    W, H = cfg['grid']
+    for el in cfg['elements'].values():
+        n = el.get('numbers')
+        if not n:
+            continue
+        out = fillet_polyline(to_px(cfg, el['outline']))
+        for v, yn in zip(el['ticks']['scales'][n['scale']], el['ticks']['y']):
+            y = yn * H
+            draw_number(img, str(v), x_on(out, y) - n['gap'], y, n['h'], n['advance'], n['color'])
+
+
 def build_static(cfg):
     """The static layer, RGBA at grid size: each bracket filled zone by zone (band, gap, stripe), then its lines and marks."""
     W, H = cfg['grid']
@@ -189,6 +245,7 @@ def build_static(cfg):
     for el in cfg['elements'].values():
         if el.get('colors') and 'band' in el:
             img = bevel(img, cfg, el)
+    draw_numbers(img, cfg)
     return img
 
 
