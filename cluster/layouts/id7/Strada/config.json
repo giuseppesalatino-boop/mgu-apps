@@ -11,8 +11,8 @@
       "_about": "The fuel gauge, bottom left (style from the user's close-up of the same design). Static: B (the thicker line) up the left side to the '1' hook (the bigger triangle at full), down to x 237 where it ends in a thin point over the reserve; A (thin) only parallel outside it, on to x 271 along the bottom; small triangles on B's inner side (tiny at 1/4 and 3/4, bigger at 1/2); grey trails fading from the '1' hook and the 1/2 triangle towards their labels; the red reserve; labels. Live (only where there is fuel, under the level line): the grey track between B and C, C (the lit edge, the '0' line at the bottom), the lit gradient, and the level bar.",
       "A": [
         [
-          0.08219,
-          0.58125
+          0.08146,
+          0.57972
         ],
         [
           0.07974,
@@ -308,14 +308,14 @@
           32
         ],
         "reserve": [
-          200,
-          68,
-          72
+          232,
+          38,
+          48
         ],
         "reserve_end": [
-          100,
+          125,
           12,
-          13
+          16
         ]
       },
       "fill": {
@@ -369,38 +369,60 @@
         "_about": "the red reserve mark in the track under the '0' (photo: x 236-300, a step at 262)",
         "poly": [
           [
-            0.12292,
-            0.79611
+            0.12323,
+            0.79528
           ],
           [
-            0.13646,
-            0.79611
+            0.13568,
+            0.79528
           ],
           [
-            0.13646,
-            0.78681
+            0.13661,
+            0.78639
           ],
           [
             0.15625,
-            0.77431
+            0.77361
           ],
           [
             0.15781,
-            0.78264
+            0.78194
           ],
           [
-            0.13854,
-            0.79653
+            0.1388,
+            0.79667
           ],
           [
-            0.1375,
-            0.80306
+            0.13792,
+            0.80056
           ],
           [
-            0.12292,
-            0.80306
+            0.12323,
+            0.80056
           ]
-        ]
+        ],
+        "shade": {
+          "_about": "the lower red bar's top face: a thin darker wedge, nothing at B's end, widest at the step",
+          "pts": [
+            [
+              0.12344,
+              0.79528
+            ],
+            [
+              0.13568,
+              0.79528
+            ],
+            [
+              0.13542,
+              0.7975
+            ]
+          ],
+          "color": [
+            120,
+            20,
+            24
+          ]
+        }
       },
       "labels": {
         "color": [
@@ -501,20 +523,6 @@
       },
       "trails": [
         {
-          "_about": "from the '1' hook towards the label",
-          "pts": [
-            [
-              0.08958,
-              0.58958
-            ],
-            [
-              0.09792,
-              0.59194
-            ]
-          ],
-          "width": 2.4
-        },
-        {
           "_about": "from the 1/2 triangle up to the right, under the label",
           "pts": [
             [
@@ -529,16 +537,45 @@
           "width": 2.0
         }
       ],
-      "end_triangles": {
-        "_about": "on B's inner side at its two ends, pointing inwards: at the top (the '1') the bigger one, towards the '1'; at the bottom (over the reserve) a thin one, towards the '0'",
-        "top": {
-          "half": 4.6,
-          "h": 9.0
-        },
-        "bottom": {
-          "half": 1.8,
-          "h": 7.5
-        }
+      "B_corner": [
+        0.08521,
+        0.59028
+      ],
+      "top": {
+        "_about": "the '1' (close-up): B turns at its top corner into a white wedge that narrows and greys out towards the '1' (the bigger triangle), and a short barb goes up-left from the corner, clear of A's rounded tip",
+        "wedge": [
+          [
+            0.08458,
+            0.59069
+          ],
+          [
+            0.09818,
+            0.59208
+          ]
+        ],
+        "w0": 4.6,
+        "w1": 0.8,
+        "c0": [
+          248,
+          246,
+          242
+        ],
+        "c1": [
+          60,
+          60,
+          60
+        ],
+        "barb": [
+          [
+            0.08542,
+            0.58944
+          ],
+          [
+            0.08354,
+            0.57917
+          ]
+        ],
+        "barb_width": 2.6
       }
     }
   }

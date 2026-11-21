@@ -74,7 +74,8 @@ def fuel_paths(cfg):
     W, H = cfg['grid']
     A = densify(px(cfg, el['A']))
     B = offset(A, el['B_offset'])                               # B: A's parallel, from its top end down to x 237
-    B = [p for p in B if p[0] <= el['B_end_x'] * W or p[1] < 560]
+    B = [p for p in B if (p[0] <= el['B_end_x'] * W or p[1] < 560) and p[1] >= el['B_corner'][1] * H + 1.5]
+    B = px(cfg, [el['B_corner']]) + B                           # its top: a corner turning into the '1' wedge
     C = densify(px(cfg, el['C']))
     return A, B, C
 
@@ -150,19 +151,13 @@ def draw_fuel_static(img, cfg, trails=True):
         hw = el['B_width'] / 2 * np.linspace(1, 0.12, len(pts))[:, None]
         poly = list(pts + nn * hw) + list((pts - nn * hw)[::-1])
         d.polygon([(x * SS, y * SS) for x, y in poly], fill=lc)
-    et = el.get('end_triangles')
-    if et:                                                      # at B's ends, on its inner side, pointing inwards
-        for key, (i0, i1) in (('top', (0, 1)), ('bottom', (len(B) - 1, len(B) - 2))):
-            s = et[key]
-            e, e2 = np.array(B[i0], float), np.array(B[i1], float)
-            tg = (e2 - e) / np.linalg.norm(e2 - e)              # along B, away from the end
-            inw = np.array([-tg[1], tg[0]]) if key == 'top' else np.array([tg[1], -tg[0]])
-            if np.dot(inw, np.array(C[len(C) // 2]) - e) < 0:
-                inw = -inw
-            q = e + tg * s['half'] + inw * el['B_width'] / 2 * 0.6
-            apex = q + inw * s['h'] - tg * s['half'] * 0.6     # leaning towards the end, like a barb
-            tri = [e + inw * el['B_width'] / 2 * 0.6 - tg * 0.3, apex, q + tg * s['half']]
-            d.polygon([(x * SS, y * SS) for x, y in tri], fill=lc)
+    tp = el.get('top')
+    if tp:                                                      # the '1': the wedge towards the label and the barb
+        _strip(d, px(cfg, tp['wedge']), tp['w0'], tp['w1'], tuple(tp['c0']), tuple(tp['c1']))
+        _line(d, px(cfg, tp['barb']), tp['barb_width'], lc)
+    sh = el['reserve'].get('shade')
+    if sh:
+        d.polygon([(x * SS, y * SS) for x, y in px(cfg, sh['pts'])], fill=tuple(sh['color']))
     for t in el.get('triangles', []):                           # on B's inner side, apex towards C
         p, dv = level_point(cfg, C, t['at'])
         i, q = nearest(B, p)
