@@ -120,7 +120,7 @@ def _strip(d, pts, w0, w1, c0, c1, steps=None):
         d.polygon([(q[0] * SS, q[1] * SS) for q in quad], fill=c)
 
 
-def draw_fuel_static(img, cfg, trails=True):
+def draw_fuel_static(img, cfg, trails=True, level=None):
     """The fixed part (supersampled canvas): the reserve, the thin line A, the thicker line B with its hook and its thin
     end, the triangles on B and the grey trails fading towards the labels."""
     el = cfg['elements']['fuel']
@@ -174,8 +174,10 @@ def draw_fuel_static(img, cfg, trails=True):
         qb_arr = np.array(qb, dtype=float)
 
         # 1) Tacca bianca che attraversa l'intera fascia grigia da B fino a C
-        tick_w = t.get('line_w', 2.2)
-        _line(d, [tuple(qb_arr), tuple(p_arr)], tick_w, lc)
+        # (solo sotto il livello, insieme alla fascia grigia: nel layer fisso no)
+        if level is not None and t['at'] < level:
+            tick_w = t.get('line_w', 2.2)
+            _line(d, [tuple(qb_arr), tuple(p_arr)], tick_w, lc)
 
         # 2) Invito triangolare su B (solo se h > 0, es. su 1/2)
         if t.get('h', 0) > 0:
@@ -313,7 +315,7 @@ def draw_dynamic(img, cfg, tel):
         img = draw_fuel_level(img, cfg, tel['fuel'])
         W, H = cfg['grid']                                      # the rail (lines, triangles, trails) stays over the fill
         rail = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
-        draw_fuel_static(rail, cfg, trails=False)            # over the fill the trails show as lighter lines
+        draw_fuel_static(rail, cfg, trails=False, level=float(np.clip(tel['fuel'], 0, 1)))            # over the fill the trails show as lighter lines
         img.alpha_composite(rail.resize((W, H), Image.LANCZOS))
         draw_fuel_labels(img, cfg)                              # the labels stay over the bar (as on the photo)
     return img
