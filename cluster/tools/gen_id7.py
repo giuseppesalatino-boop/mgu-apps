@@ -72,16 +72,9 @@ def interp(stops, v):
 def fuel_paths(cfg):
     el = cfg['elements']['fuel']
     W, H = cfg['grid']
-    a = px(cfg, el['A'])
-    A = [a[0]] + densify(a[1:])                                 # its top: a short stroke parallel to the spike's right edge
-    Boff = offset(densify(px(cfg, el['A'])[1:]), el['B_offset'])
-    Boff = [p for p in Boff if p[0] <= el['B_end_x'] * W and p[1] >= 428]
-    top = px(cfg, el['B_top']) + [Boff[0]]
-    B = []
-    for a, b in zip(top[:-1], top[1:]):                          # straight segments: the spike stays sharp
-        k = max(2, int(math.hypot(b[0] - a[0], b[1] - a[1])))
-        B += [(a[0] + (b[0] - a[0]) * i / k, a[1] + (b[1] - a[1]) * i / k) for i in range(k)]
-    B += Boff
+    A = densify(px(cfg, el['A']))
+    B = offset(A, el['B_offset'])                               # B: A's parallel, from its top end down to x 237
+    B = [p for p in B if p[0] <= el['B_end_x'] * W or p[1] < 560]
     C = densify(px(cfg, el['C']))
     return A, B, C
 
@@ -157,6 +150,19 @@ def draw_fuel_static(img, cfg, trails=True):
         hw = el['B_width'] / 2 * np.linspace(1, 0.12, len(pts))[:, None]
         poly = list(pts + nn * hw) + list((pts - nn * hw)[::-1])
         d.polygon([(x * SS, y * SS) for x, y in poly], fill=lc)
+    et = el.get('end_triangles')
+    if et:                                                      # at B's ends, on its inner side, pointing inwards
+        for key, (i0, i1) in (('top', (0, 1)), ('bottom', (len(B) - 1, len(B) - 2))):
+            s = et[key]
+            e, e2 = np.array(B[i0], float), np.array(B[i1], float)
+            tg = (e2 - e) / np.linalg.norm(e2 - e)              # along B, away from the end
+            inw = np.array([-tg[1], tg[0]]) if key == 'top' else np.array([tg[1], -tg[0]])
+            if np.dot(inw, np.array(C[len(C) // 2]) - e) < 0:
+                inw = -inw
+            q = e + tg * s['half'] + inw * el['B_width'] / 2 * 0.6
+            apex = q + inw * s['h'] - tg * s['half'] * 0.6     # leaning towards the end, like a barb
+            tri = [e + inw * el['B_width'] / 2 * 0.6 - tg * 0.3, apex, q + tg * s['half']]
+            d.polygon([(x * SS, y * SS) for x, y in tri], fill=lc)
     for t in el.get('triangles', []):                           # on B's inner side, apex towards C
         p, dv = level_point(cfg, C, t['at'])
         i, q = nearest(B, p)

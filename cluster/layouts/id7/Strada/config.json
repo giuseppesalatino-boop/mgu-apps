@@ -11,12 +11,8 @@
       "_about": "The fuel gauge, bottom left (style from the user's close-up of the same design). Static: B (the thicker line) up the left side to the '1' hook (the bigger triangle at full), down to x 237 where it ends in a thin point over the reserve; A (thin) only parallel outside it, on to x 271 along the bottom; small triangles on B's inner side (tiny at 1/4 and 3/4, bigger at 1/2); grey trails fading from the '1' hook and the 1/2 triangle towards their labels; the red reserve; labels. Live (only where there is fuel, under the level line): the grey track between B and C, C (the lit edge, the '0' line at the bottom), the lit gradient, and the level bar.",
       "A": [
         [
-          0.08672,
-          0.58264
-        ],
-        [
-          0.08281,
-          0.57083
+          0.08219,
+          0.58125
         ],
         [
           0.07974,
@@ -137,16 +133,6 @@
       ],
       "A_width": 1.7,
       "B_offset": 6.0,
-      "B_top": [
-        [
-          0.08776,
-          0.59083
-        ],
-        [
-          0.08438,
-          0.57847
-        ]
-      ],
       "B_end_x": 0.12344,
       "B_width": 2.9,
       "C": [
@@ -480,7 +466,7 @@
           0.77917
         ]
       ],
-      "B_tail": 11,
+      "B_tail": 0,
       "triangles": [
         {
           "at": 0.25,
@@ -518,12 +504,12 @@
           "_about": "from the '1' hook towards the label",
           "pts": [
             [
-              0.08776,
-              0.59111
+              0.08958,
+              0.58958
             ],
             [
-              0.0974,
-              0.59222
+              0.09792,
+              0.59194
             ]
           ],
           "width": 2.4
@@ -542,7 +528,18 @@
           ],
           "width": 2.0
         }
-      ]
+      ],
+      "end_triangles": {
+        "_about": "on B's inner side at its two ends, pointing inwards: at the top (the '1') the bigger one, towards the '1'; at the bottom (over the reserve) a thin one, towards the '0'",
+        "top": {
+          "half": 4.6,
+          "h": 9.0
+        },
+        "bottom": {
+          "half": 1.8,
+          "h": 7.5
+        }
+      }
     }
   }
 }
