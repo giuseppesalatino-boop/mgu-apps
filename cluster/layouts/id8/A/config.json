@@ -1,0 +1,1567 @@
+{
+  "_about": "ID8 layout A (reference photo 3): every position is normalized to the 1920x720 calibration grid (x / 1920, y / 720); radii are px of that grid. Measured on design/refs/id8/A.png (the photo straightened on the backlit panel's corners). Edit here, then: python3 cluster/tools/gen_static.py id8/A",
+  "grid": [
+    1920,
+    720
+  ],
+  "elements": {
+    "bracket_left": {
+      "_about": "The blue speed bracket's outer profile, from the end of its top line round the apex, then straight along y 635 past the 0 to where the light band ends at x 510 (the darker band and glow below are the shadow, drawn later). Legs fitted on the photo's pixels (max error 1.1 px): upper x = -0.5911 y + 346.31, lower x = 0.5755 y - 25.78; the right bracket is its mirror about x 0.5 (checked later on the red one).",
+      "outline": [
+        [
+          0.34635,
+          0.16389,
+          0
+        ],
+        [
+          0.14404,
+          0.16389,
+          8
+        ],
+        [
+          0.08218,
+          0.44299,
+          33
+        ],
+        [
+          0.17693,
+          0.88194,
+          8
+        ],
+        [
+          0.26406,
+          0.88194,
+          0
+        ]
+      ],
+      "inner": [
+        [
+          0.34635,
+          0.16389,
+          0
+        ],
+        [
+          0.19678,
+          0.16389,
+          24
+        ],
+        [
+          0.12646,
+          0.47958,
+          30
+        ],
+        [
+          0.21109,
+          0.86806,
+          8
+        ],
+        [
+          0.26562,
+          0.86806,
+          0
+        ],
+        [
+          0.26406,
+          0.88194,
+          0
+        ]
+      ],
+      "_about_inner": "The bracket's inner profile: parallel to the outer one (upper x = -0.594 y + 447.9, lower x = 0.581 y + 42.2), the band wider above the apex (~100 px across) than below it (~71 px); at the top it turns level onto the top line itself (y 118), so the top is one single line to x 665; at the bottom it runs level at y 625 to x 510 and the slanted end cut (510,625)-(507,635) closes the 10 px foot.",
+      "parallel": [
+        [
+          0.15218,
+          0.16806,
+          0
+        ],
+        [
+          0.09,
+          0.44861,
+          28
+        ],
+        [
+          0.18051,
+          0.86806,
+          6
+        ],
+        [
+          0.21109,
+          0.86806,
+          0
+        ]
+      ],
+      "_about_parallel": "The parallel just inside the outer profile: the inner edge of the light outer stripe (15 px thick across on the upper leg, 11 on the lower; upper x = -0.5911 y + 363.7, lower x = 0.5755 y - 13.1, measured square to the legs on the photo), from the top line down to y 625 and on along the foot's top edge to the inner profile. The graduated marks sit in the dark gap just inside it.",
+      "ticks": {
+        "_about": "The graduated marks: one short level dash per number, in the dark gap just inside the parallel (from the parallel + start to + start + length, px), at the photo's heights. The scale is not even in value: 60 km/h per mark above 150, 30 below, the marks ~56 / ~59 px apart. 60, 30 and 0 sit in the lit part of the photo: their heights follow the 59 px spacing (60 found at 495). Two full scales on the same marks, chosen in the app: 330 (30 km/h a step to 150, then 60) and 260 (20 a step to 60, then 40); a speed's height comes from its two neighbouring marks of the chosen scale. In mph: 200 (20 a step to 120, then 40) for the 330 km/h scale and 160 (20 a step) for the 260.",
+        "y": [
+          0.20903,
+          0.28611,
+          0.36389,
+          0.44167,
+          0.525,
+          0.60694,
+          0.68889,
+          0.77083,
+          0.85278
+        ],
+        "start": 4.5,
+        "length": 11.5,
+        "thick": 3,
+        "scales": {
+          "330": [
+            330,
+            270,
+            210,
+            150,
+            120,
+            90,
+            60,
+            30,
+            0
+          ],
+          "260": [
+            260,
+            220,
+            180,
+            140,
+            100,
+            60,
+            40,
+            20,
+            0
+          ],
+          "200mph": [
+            200,
+            160,
+            120,
+            100,
+            80,
+            60,
+            40,
+            20,
+            0
+          ],
+          "160mph": [
+            160,
+            140,
+            120,
+            100,
+            80,
+            60,
+            40,
+            20,
+            0
+          ]
+        }
+      },
+      "band": [
+        [
+          0.16306,
+          0.16806,
+          0
+        ],
+        [
+          0.10021,
+          0.45153,
+          29
+        ],
+        [
+          0.1901,
+          0.86806,
+          6
+        ],
+        [
+          0.21109,
+          0.86806,
+          0
+        ]
+      ],
+      "_about_band": "The blue band's outer edge, just right of the graduated marks: 33 px in from the outer profile across the upper leg, 27 across the lower (upper x = -0.5911 y + 384.6, lower x = 0.5755 y + 5.3), from the top line to y 625 and on along the foot to the inner profile. Between it and the inner profile is the band that fills light blue up to the speed (drawn last, it moves).",
+      "colors": {
+        "_about": "RGB medians of the photo inside each zone, on the upper legs (the lower part of the photo is lit by the speed fill).",
+        "stripe": [
+          14,
+          154,
+          235
+        ],
+        "gap": [
+          3,
+          8,
+          18
+        ],
+        "band": [
+          11,
+          58,
+          137
+        ],
+        "top_line": [
+          155,
+          208,
+          230
+        ],
+        "inner_line": [
+          120,
+          185,
+          237
+        ],
+        "tick": [
+          158,
+          173,
+          211
+        ]
+      },
+      "bevel": {
+        "_about": "The 3D look, as a brightness profile across each zone (t: 0 at its outer edge, 1 at its inner edge), multiplying the zone's colour. stripe: a tube, 'edge' at both rims rising to 1 in the middle, plus a glossy highlight of 'gloss' (added towards white) centred at t 'gloss_at', 'gloss_w' wide. band: a hollow, 'edge' at the gap side rising to 1 over 'rise' of its width, falling to 'inner' just before the inner line. soft: px over which every edge is feathered.",
+        "stripe": {
+          "edge": 0.72,
+          "gloss": 0.22,
+          "gloss_at": 0.32,
+          "gloss_w": 0.16
+        },
+        "band": {
+          "edge": 0.85,
+          "rise": 0.15,
+          "inner": 0.4
+        },
+        "soft": 1.2
+      },
+      "numbers": {
+        "_about": "The scale's numbers, BMW's squared digits drawn as shapes (tools/gen_static.py DIGITS, measured on the photo's 330 / 270 / 150 / 60 / 30: 22 px tall, 29 wide, the 1 18 wide, uprights 6.5 thick, bars 4, digits 32.5 apart), right-aligned 'gap' px left of the outer profile at each mark's height, centred on it. 'scale' picks the scale (ticks.scales).",
+        "scale": "260",
+        "h": 22,
+        "advance": 32.5,
+        "gap": 14.2,
+        "color": [
+          110,
+          168,
+          228
+        ],
+        "lit": {
+          "_about": "Live: a number turns white as the value nears it, fading smoothly with the distance (white at the mark, back to its dim colour 'fade' marks away), as on BMW's M layouts.",
+          "color": [
+            245,
+            247,
+            250
+          ],
+          "full": 0.0,
+          "fade": 1.0
+        }
+      }
+    },
+    "label_speed_unit": {
+      "_about": "The speed scale's unit over the bracket: the ink of the text fits the photo's box (x 306-364, y 90-111: 'k' and 'h' tops to the baseline), left-aligned; with an mph scale the text is 'mph' at the same height. Barlow Semi Condensed Medium, a touch heavier ('bold') (SIL OFL, tools/fonts-src).",
+      "label": {
+        "text": "km/h",
+        "text_mph": "mph",
+        "font": "BarlowSemiCondensed-Medium.ttf",
+        "box": [
+          0.15937,
+          0.125,
+          0.1901,
+          0.15417
+        ],
+        "color": [
+          186,
+          194,
+          219
+        ],
+        "scale_of": "bracket_left",
+        "bold": 0.012,
+        "lift_mph": 4
+      }
+    },
+    "bracket_right": {
+      "_about": "The red rev bracket: the exact mirror of bracket_left about x 0.5 (BMW's cluster is symmetric; the photo's right side carries a little residual perspective, 0..17 px). Only its colours, marks' scale, numbers and label are its own, measured on the photo.",
+      "mirror_of": "bracket_left",
+      "colors": {
+        "_about": "RGB medians of the photo inside each mirrored zone, upper legs (y 135..250, where the photo's perspective is under 5 px).",
+        "stripe": [
+          237,
+          44,
+          78
+        ],
+        "gap": [
+          22,
+          5,
+          6
+        ],
+        "band": [
+          82,
+          21,
+          34
+        ],
+        "top_line": [
+          228,
+          142,
+          146
+        ],
+        "inner_line": [
+          222,
+          142,
+          157
+        ],
+        "tick": [
+          193,
+          111,
+          130
+        ]
+      },
+      "ticks": {
+        "_about": "The same heights as the speed scale's marks, the dashes on the inner side of the mirrored parallel.",
+        "y": [
+          0.20903,
+          0.28611,
+          0.36389,
+          0.44167,
+          0.525,
+          0.60694,
+          0.68889,
+          0.77083,
+          0.85278
+        ],
+        "scales": {
+          "8": [
+            8,
+            7,
+            6,
+            5,
+            4,
+            3,
+            2,
+            1,
+            0
+          ],
+          "6": {
+            "values": [
+              6,
+              5,
+              4,
+              3,
+              2,
+              1,
+              0
+            ],
+            "y": [
+              0.20972,
+              0.31667,
+              0.42361,
+              0.53194,
+              0.63889,
+              0.74583,
+              0.85278
+            ]
+          }
+        },
+        "start": 4.5,
+        "length": 11.5,
+        "thick": 3
+      },
+      "numbers": {
+        "_about": "Left-aligned 'gap' px right of the outer profile; a touch larger than the speed numbers (the photo's 8 and 5: 25 px tall incl. edge blur).",
+        "scale": "8",
+        "h": 24,
+        "advance": 32.5,
+        "gap": 15,
+        "color": [
+          158,
+          98,
+          102
+        ],
+        "align": "left",
+        "lit": {
+          "_about": "Live: a number turns white as the value nears it, fading smoothly with the distance (white at the mark, back to its dim colour 'fade' marks away), as on BMW's M layouts.",
+          "color": [
+            245,
+            247,
+            250
+          ],
+          "full": 0.0,
+          "fade": 1.0
+        }
+      },
+      "rev_zones": {
+        "_about": "Rev zones (dynamic layer), in steps of oil temperature: below 60 C red from cold_red; 60..75 C yellow from cold_red and red from cold_red + 1000; from 75 C the warm zones: yellow from 'yellow', red from 'red' (set in the app within red_range). rpm.",
+        "petrol": {
+          "scale": "8",
+          "cold_red": 4000,
+          "yellow": 6500,
+          "red": 7000,
+          "red_range": [
+            7000,
+            7500
+          ]
+        },
+        "diesel": {
+          "scale": "6",
+          "cold_red": 3000,
+          "yellow": 4500,
+          "red": 5000,
+          "red_range": [
+            5000,
+            5000
+          ]
+        },
+        "steps_c": [
+          60,
+          75
+        ]
+      }
+    },
+    "label_rpm_unit": {
+      "_about": "The rev scale's unit over the red bracket, fitted to the photo's box (x 1470-1617, y 91-110).",
+      "label": {
+        "text": "1/min x 1000",
+        "font": "BarlowSemiCondensed-Medium.ttf",
+        "box": [
+          0.76562,
+          0.12639,
+          0.84271,
+          0.15278
+        ],
+        "color": [
+          192,
+          175,
+          183
+        ],
+        "bold": 0.012
+      }
+    },
+    "fuel": {
+      "_about": "The fuel gauge inside the speed bracket: a white rail and, 3 px right of it, a track in 4 equal segments (gaps at 1/4, 1/2, 3/4), both slanted like the bracket's lower leg (x = 0.5755 y + c), level ends at y 428 and 608. Measured on the photo (rail x = 0.5755 y + 83.5, 6.5 wide; track + 93.5, 15.5 wide; gaps 2.5 px). The track is empty grey here; its fill from 0 to the level is dynamic.",
+      "rail": [
+        [
+          0.17178,
+          0.59444
+        ],
+        [
+          0.17516,
+          0.59444
+        ],
+        [
+          0.22912,
+          0.84444
+        ],
+        [
+          0.22573,
+          0.84444
+        ]
+      ],
+      "track": [
+        [
+          0.17699,
+          0.59444
+        ],
+        [
+          0.18506,
+          0.59444
+        ],
+        [
+          0.23901,
+          0.84444
+        ],
+        [
+          0.23094,
+          0.84444
+        ]
+      ],
+      "gaps": [
+        0.25,
+        0.5,
+        0.75
+      ],
+      "gap_px": 2.5,
+      "colors": {
+        "rail": [
+          223,
+          223,
+          234
+        ],
+        "track": [
+          151,
+          151,
+          175
+        ]
+      },
+      "warn": {
+        "_about": "The fuel track's fill turns yellow at the reserve and red near empty (dynamic layer). 'by' is chosen in the app: litres in the tank or the range; both come from KombiIF statusRangeTankStatus.",
+        "by": "litres",
+        "litres": {
+          "yellow": 8,
+          "red": 4
+        },
+        "range_km": {
+          "yellow": 90,
+          "red": 50
+        },
+        "colors": {
+          "yellow": [
+            255,
+            196,
+            0
+          ],
+          "red": [
+            235,
+            30,
+            40
+          ]
+        }
+      },
+      "labels": {
+        "_about": "The gauge's labels in the speed scale's digits, narrowed to the photo's width (sx 0.7; uprights keep their thickness), 'gap' px apart, left edge and centre height measured on the photo; the pump is the ISO 2575 fuel symbol drawn as shapes in BMW's style (tools/gen_static.py draw_pump), with the arrow to the filler side, in its 35 x 28 px box.",
+        "sx": 0.7,
+        "color": [
+          237,
+          238,
+          246
+        ],
+        "items": [
+          {
+            "text": "1",
+            "at": [
+              0.19323,
+              0.60903
+            ],
+            "h": 20
+          },
+          {
+            "text": "1/2",
+            "at": [
+              0.21719,
+              0.71875
+            ],
+            "h": 22
+          },
+          {
+            "text": "0",
+            "at": [
+              0.24323,
+              0.82847
+            ],
+            "h": 22
+          }
+        ],
+        "icon": {
+          "kind": "pump",
+          "at": [
+            0.23281,
+            0.75417
+          ],
+          "size": [
+            35,
+            28
+          ]
+        },
+        "gap": 2.6
+      },
+      "bevel": {
+        "_about": "Light 3D across each strip (t 0 at its outer edge, 1 at its inner one), multiplying its colour: the rail a tube ('edge' at both rims, a 'gloss' highlight at 'gloss_at'), the track's segments brighter by 'lit' at the outer edge falling off over 'lit_w', and 'shade' darker towards the inner edge.",
+        "rail": {
+          "edge": 0.8,
+          "gloss": 0.12,
+          "gloss_at": 0.4,
+          "gloss_w": 0.22
+        },
+        "track": {
+          "lit": 0.22,
+          "lit_w": 0.18,
+          "shade": 0.12
+        }
+      }
+    },
+    "oil": {
+      "_about": "The oil temperature gauge inside the rev bracket: the fuel gauge's exact mirror about x 0.5 (rail outside, 4-segment track); its rail carries the zones (red at the hot end, blue at the cold end, fractions from the cold end), its labels are right-aligned towards the gauge, measured on the photo. Petrol: engine oil, 50-150 C. Diesel: coolant, 50-130 C, the middle mark at 90.",
+      "mirror_of": "fuel",
+      "rail_zones": [
+        {
+          "from": 0.0,
+          "to": 0.122,
+          "color": [
+            120,
+            181,
+            226
+          ]
+        },
+        {
+          "from": 0.122,
+          "to": 0.878,
+          "color": [
+            223,
+            223,
+            234
+          ]
+        },
+        {
+          "from": 0.9,
+          "to": 1.0,
+          "color": [
+            226,
+            60,
+            92
+          ]
+        }
+      ],
+      "labels": {
+        "sx": 0.7,
+        "gap": 2.6,
+        "color": [
+          234,
+          235,
+          240
+        ],
+        "text": [
+          {
+            "text": "\u00b0C",
+            "font": "BarlowSemiCondensed-Medium.ttf",
+            "box": [
+              0.76979,
+              0.64722,
+              0.7849,
+              0.68056
+            ],
+            "color": [
+              214,
+              215,
+              221
+            ],
+            "bold": 0.012,
+            "text_imperial": "\u00b0F"
+          }
+        ],
+        "variants": {
+          "petrol": {
+            "items": [
+              {
+                "text": "150",
+                "at": [
+                  0.8,
+                  0.60694
+                ],
+                "h": 21,
+                "align": "right"
+              },
+              {
+                "text": "100",
+                "at": [
+                  0.77396,
+                  0.71736
+                ],
+                "h": 22,
+                "align": "right"
+              },
+              {
+                "text": "50",
+                "at": [
+                  0.75104,
+                  0.825
+                ],
+                "h": 22,
+                "align": "right"
+              }
+            ],
+            "icon": {
+              "kind": "oil",
+              "at": [
+                0.74115,
+                0.75278
+              ],
+              "size": [
+                48,
+                32
+              ]
+            },
+            "range_c": [
+              50,
+              150
+            ],
+            "items_imperial": [
+              {
+                "text": "300",
+                "at": [
+                  0.8,
+                  0.60694
+                ],
+                "h": 21,
+                "align": "right"
+              },
+              {
+                "text": "210",
+                "at": [
+                  0.77396,
+                  0.71736
+                ],
+                "h": 22,
+                "align": "right"
+              },
+              {
+                "text": "120",
+                "at": [
+                  0.75104,
+                  0.825
+                ],
+                "h": 22,
+                "align": "right"
+              }
+            ],
+            "range_f": [
+              120,
+              300
+            ]
+          },
+          "diesel": {
+            "items": [
+              {
+                "text": "130",
+                "at": [
+                  0.8,
+                  0.60694
+                ],
+                "h": 21,
+                "align": "right"
+              },
+              {
+                "text": "90",
+                "at": [
+                  0.77396,
+                  0.71736
+                ],
+                "h": 22,
+                "align": "right"
+              },
+              {
+                "text": "50",
+                "at": [
+                  0.75104,
+                  0.825
+                ],
+                "h": 22,
+                "align": "right"
+              }
+            ],
+            "icon": {
+              "kind": "coolant",
+              "at": [
+                0.74115,
+                0.75278
+              ],
+              "size": [
+                48,
+                32
+              ]
+            },
+            "range_c": [
+              50,
+              130
+            ],
+            "items_imperial": [
+              {
+                "text": "260",
+                "at": [
+                  0.8,
+                  0.60694
+                ],
+                "h": 21,
+                "align": "right"
+              },
+              {
+                "text": "190",
+                "at": [
+                  0.77396,
+                  0.71736
+                ],
+                "h": 22,
+                "align": "right"
+              },
+              {
+                "text": "120",
+                "at": [
+                  0.75104,
+                  0.825
+                ],
+                "h": 22,
+                "align": "right"
+              }
+            ],
+            "range_f": [
+              120,
+              260
+            ]
+          }
+        }
+      },
+      "warn": {
+        "_about": "The track's fill colour follows the temperature (dynamic layer), like the rev zones: blue (the speed bracket's stripe colour) up to cold_c, meaning a cold engine, then the normal fill. Red from hot_c (oil 140, coolant 120). Imperial: the same temperatures in F (cold 149, hot 284 / 248).",
+        "cold_c": 65,
+        "cold_color": [
+          14,
+          154,
+          235
+        ],
+        "hot_c": {
+          "petrol": 140,
+          "diesel": 120
+        },
+        "hot_color": [
+          235,
+          30,
+          40
+        ],
+        "cold_f": 149,
+        "hot_f": {
+          "petrol": 284,
+          "diesel": 248
+        }
+      }
+    },
+    "panel": {
+      "_about": "The central frame, symmetric about x 0.5: 'half' is its left half from the top of the axis round to the bottom of the axis (mirrored for the right). Top edge y 158; the upper side parallel to the brackets' upper legs (x = -0.593 y + 558); the speed cut-out (black, y 298..388, its inner side x = -0.588 y + 799.4); the lower side parallel to the lower legs (x = 0.5576 y + 213.7); bottom edge y 584. Measured on the photo's blue mask, both halves within ~6 px of each other. The gear cut-out is the speed one's mirror.",
+      "half": [
+        [
+          0.5,
+          0.21944,
+          0
+        ],
+        [
+          0.2417,
+          0.21944,
+          10
+        ],
+        [
+          0.19905,
+          0.41389,
+          3
+        ],
+        [
+          0.32509,
+          0.41389,
+          3
+        ],
+        [
+          0.29753,
+          0.53889,
+          3
+        ],
+        [
+          0.22398,
+          0.53889,
+          4
+        ],
+        [
+          0.28091,
+          0.81111,
+          16
+        ],
+        [
+          0.5,
+          0.81111,
+          0
+        ]
+      ],
+      "wing_half": [
+        [
+          0.20776,
+          0.22083,
+          14
+        ],
+        [
+          0.23775,
+          0.22083,
+          2
+        ],
+        [
+          0.18139,
+          0.47778,
+          2
+        ],
+        [
+          0.15159,
+          0.47778,
+          2
+        ]
+      ],
+      "_about_wing": "The left wing: left edge x = -0.583 y + 491.6, right edge parallel to the panel's (x = -0.585 y + 556.5) 7 px off it, so the black gap between them is even; top y 159, bottom y 344, the big round on its outer top corner.",
+      "gear_cut": [
+        [
+          0.70559,
+          0.41389,
+          3
+        ],
+        [
+          0.67676,
+          0.53889,
+          3
+        ]
+      ],
+      "_about_gear": "The one part that is not symmetric: the gear cut-out's inner side slants the same way as the speed cut-out's (x = -0.615 y + 1538, from (1355, 298) down to (1299, 388)), not as its mirror. 'gear_cut' replaces the two mirrored vertices.",
+      "colors": {
+        "_about": "The panel's fill by height: [y px, RGB] stops sampled on the photo's sides (x 560-760 and 1160-1360, row medians), linear between them; a lighter top band, darker middle, lighter lower part. The wings are flat. 'soften': the profile is smoothed over that many px, so the light top and the darker middle melt into each other with no straight edge.",
+        "rows": [
+          [
+            160,
+            [
+              20,
+              80,
+              200
+            ]
+          ],
+          [
+            238,
+            [
+              1,
+              83,
+              222
+            ]
+          ],
+          [
+            248,
+            [
+              0,
+              56,
+              145
+            ]
+          ],
+          [
+            300,
+            [
+              2,
+              40,
+              104
+            ]
+          ],
+          [
+            360,
+            [
+              3,
+              33,
+              87
+            ]
+          ],
+          [
+            420,
+            [
+              4,
+              39,
+              96
+            ]
+          ],
+          [
+            470,
+            [
+              6,
+              54,
+              130
+            ]
+          ],
+          [
+            480,
+            [
+              24,
+              76,
+              152
+            ]
+          ],
+          [
+            540,
+            [
+              19,
+              64,
+              132
+            ]
+          ],
+          [
+            584,
+            [
+              22,
+              60,
+              115
+            ]
+          ]
+        ],
+        "wing": [
+          [
+            160,
+            [
+              8,
+              76,
+              192
+            ]
+          ],
+          [
+            250,
+            [
+              2,
+              55,
+              146
+            ]
+          ],
+          [
+            345,
+            [
+              2,
+              46,
+              116
+            ]
+          ]
+        ],
+        "soften": 26
+      },
+      "top_right": [
+        [
+          0.80312,
+          0.41389,
+          3
+        ],
+        [
+          0.81771,
+          0.35,
+          12
+        ],
+        [
+          0.79047,
+          0.21944,
+          24
+        ]
+      ],
+      "wing_right": [
+        [
+          0.8201,
+          0.35542,
+          2
+        ],
+        [
+          0.84479,
+          0.47639,
+          3
+        ],
+        [
+          0.81719,
+          0.47639,
+          3
+        ],
+        [
+          0.80677,
+          0.41389,
+          2
+        ]
+      ],
+      "_about_right": "Not symmetric at the top right either: the panel's right edge runs on the wing's mirrored line (x = 1521 + 0.545 (y - 164)) down to (1570, 252) and turns in to the gear cut-out, so there is no wing over it at the top; the right wing is a small chevron below (258..343). Measured on the photo's blue mask. Top-left: the panel's corner is nearly sharp, the wing's outer corner carries the big round. The right wing's upper left edge runs parallel to the panel's edge (x = 1570 - 0.609 (y - 252)), 7 px off it, so the black gap is even.",
+      "lines": {
+        "_about": "The panel's thin light lines (the road, the lanes and the cars of the photo are the slot's content, not these): segments in screen px normalized, drawn 'width' px wide by adding 'add' to the blue under them, only inside the panel and its wings. Measured on the photo's high-pass image: the line at y 239 is the top band's lower edge, y 296 runs from the speed cut-out to x 823 and from x 1121 to the gear cut-out, three diagonals from the top edge, one parallel to the lower legs below the speed cut-out, and the two small strokes under the cut-outs.",
+        "segments": [
+          [
+            0.31771,
+            0.33194,
+            0.70365,
+            0.33194
+          ],
+          [
+            0.19896,
+            0.41111,
+            0.42865,
+            0.41111
+          ],
+          [
+            0.58385,
+            0.41111,
+            0.80312,
+            0.41111
+          ],
+          [
+            0.32031,
+            0.22361,
+            0.27917,
+            0.41111
+          ],
+          [
+            0.5375,
+            0.22361,
+            0.56094,
+            0.33333
+          ],
+          [
+            0.68073,
+            0.22361,
+            0.72135,
+            0.41111
+          ],
+          [
+            0.27917,
+            0.41111,
+            0.32656,
+            0.64306
+          ],
+          [
+            0.24844,
+            0.54444,
+            0.23594,
+            0.59722
+          ],
+          [
+            0.75156,
+            0.54444,
+            0.76406,
+            0.59722
+          ]
+        ],
+        "width": 1.8,
+        "add": [
+          26,
+          24,
+          24
+        ]
+      }
+    },
+    "speed": {
+      "_about": "The speed in the speed cut-out: BMW's big squared digits (tools/gen_static.py big_glyph: 76 x 59 px, bars 10, uprights 22, measured on the photo's 57), right edge at x 540, top at y 315, 10 px apart; always full size: three digits grow to the left over the cut-out's slanted side. Dynamic: drawn by the live layer, sampled here with the photo's value.",
+      "digits": {
+        "right": 0.28125,
+        "top": 0.4375,
+        "w": 76,
+        "h": 59,
+        "bar": 10,
+        "upright": 22,
+        "gap": 10,
+        "color": [
+          248,
+          249,
+          251
+        ]
+      },
+      "sample": "57"
+    },
+    "gear": {
+      "_about": "The gear in the gear cut-out: the same big glyphs, letter + gear number (D1..D8, S1.., M1..; P R N alone), right edge at x 1526 (the photo's D), top at y 315. Dynamic, sampled here.",
+      "digits": {
+        "right": 0.79479,
+        "top": 0.4375,
+        "w": 76,
+        "h": 59,
+        "bar": 10,
+        "upright": 22,
+        "gap": 10,
+        "letter_w": 70,
+        "color": [
+          250,
+          252,
+          252
+        ]
+      },
+      "sample": "D"
+    },
+    "label_speed_live_unit": {
+      "_about": "The unit under the big speed, fitted to the photo's box (x 476-534, y 382-401); mph with an mph scale.",
+      "label": {
+        "text": "km/h",
+        "text_mph": "mph",
+        "font": "BarlowSemiCondensed-Medium.ttf",
+        "box": [
+          0.24792,
+          0.53056,
+          0.27865,
+          0.55694
+        ],
+        "color": [
+          144,
+          163,
+          219
+        ],
+        "bold": 0.012,
+        "scale_of": "bracket_left",
+        "lift_mph": 3
+      }
+    },
+    "map_window": {
+      "_about": "The centre slot as a map (cfg 'center' = 'map'): a see-through window in our layer where the BMW map (KOMBI slot 0x100, under us) shows. Hypothesis until measured on the car: the whole central panel, up to the speed and gear inserts (its notches) without entering them, inset 8 px for an even blue rim.",
+      "of": "panel",
+      "inset": 8,
+      "_about_host": "Phone maps (Waze, CarPlay, Google Maps via Waze on Cluster): our panel scene hosts the 'map' target (1088x480) with cluster-render's 'host' message, the video under our frame and seen only through this window. host = the window's bounding rect on the panel target after the fit (px of 1920x720); src = the part of the map shown there, full width and the middle rows, so the map keeps its proportions (no stretch).",
+      "host": {"x": 523, "y": 176, "w": 901, "h": 318, "src_x": 0, "src_y": 48, "src_w": 1088, "src_h": 384}
+    },
+    "tray": {
+      "_about": "The stylised blue trapezoid under the bottom bar, at the centre: 4 slanted segments split by thin black cuts (the first '\\', the others '/'), the whole sheared left as on the photo. Edges fitted on the photo's rows y 664-703 (subpixel, blue channel), top 648.5 / bottom 705.5. Vertical gradient sampled at x 820-1080.",
+      "segments": [
+        [
+          [
+            0.41255,
+            0.90069
+          ],
+          [
+            0.43932,
+            0.90069
+          ],
+          [
+            0.45557,
+            0.97986
+          ],
+          [
+            0.395,
+            0.97986
+          ]
+        ],
+        [
+          [
+            0.44229,
+            0.90069
+          ],
+          [
+            0.49964,
+            0.90069
+          ],
+          [
+            0.48234,
+            0.97986
+          ],
+          [
+            0.45854,
+            0.97986
+          ]
+        ],
+        [
+          [
+            0.50339,
+            0.90069
+          ],
+          [
+            0.55318,
+            0.90069
+          ],
+          [
+            0.53573,
+            0.97986
+          ],
+          [
+            0.485,
+            0.97986
+          ]
+        ],
+        [
+          [
+            0.55651,
+            0.90069
+          ],
+          [
+            0.59396,
+            0.90069
+          ],
+          [
+            0.57703,
+            0.97986
+          ],
+          [
+            0.53859,
+            0.97986
+          ]
+        ]
+      ],
+      "stops": [
+        [
+          0.0,
+          [
+            1,
+            38,
+            100
+          ]
+        ],
+        [
+          0.17,
+          [
+            2,
+            45,
+            117
+          ]
+        ],
+        [
+          0.27,
+          [
+            2,
+            48,
+            123
+          ]
+        ],
+        [
+          0.41,
+          [
+            5,
+            55,
+            140
+          ]
+        ],
+        [
+          0.55,
+          [
+            13,
+            64,
+            158
+          ]
+        ],
+        [
+          0.69,
+          [
+            17,
+            68,
+            170
+          ]
+        ],
+        [
+          0.83,
+          [
+            22,
+            72,
+            170
+          ]
+        ],
+        [
+          0.94,
+          [
+            33,
+            81,
+            168
+          ]
+        ],
+        [
+          1.0,
+          [
+            36,
+            84,
+            166
+          ]
+        ]
+      ]
+    },
+    "bottom_bar": {
+      "_about": "The grey bar under the frame, on the same line as the brackets' feet (y 625-635, their inner and outer profiles), x 517-1403 (symmetric), its ends cut slanted like the feet's, lighter along its middle.",
+      "bar": {
+        "x": [
+          0.26927,
+          0.73073
+        ],
+        "y": [
+          0.86806,
+          0.88194
+        ],
+        "slant": 3,
+        "color": [
+          187,
+          188,
+          206
+        ],
+        "edge": 0.78
+      }
+    },
+    "feet_glow": {
+      "_about": "The blurred glow under each bracket's foot (blue under the speed one, red under the rev one, its mirror): a band from y_top, brightest at y_peak, gone by y_end; full from its outer edge (slanted, x_out at the top -> x_out_bottom) to x_full, fading out by x_fade. Measured on the photo's pixel columns (x 400, 480, 560, 700; 1450, 1550).",
+      "y_top": 0.89028,
+      "y_peak": 0.9,
+      "y_end": 0.94444,
+      "x_out": 0.18125,
+      "x_out_bottom": 0.1776,
+      "x_full": 0.22917,
+      "x_fade": 0.44792,
+      "blue": [
+        6,
+        108,
+        235
+      ],
+      "red": [
+        229,
+        44,
+        60
+      ]
+    },
+    "bottom_row": {
+      "_about": "The bottom row, as on the reference photo: the clock left, the range with the pump icon, the outside temperature right. Live values (sampled here with the photo's), in the scale's digits narrowed to the photo's width (sx 0.7, 3.5 px apart, 28 px tall), white; units in the label font. Positions are the photo's left edges and centre heights.",
+      "row": {
+        "h": 28,
+        "sx": 0.7,
+        "gap": 3.5,
+        "color": [
+          230,
+          231,
+          236
+        ],
+        "items": [
+          {
+            "id": "clock",
+            "sample": "19:03",
+            "at": [
+              0.03594,
+              0.96736
+            ]
+          },
+          {
+            "id": "range",
+            "sample": "400",
+            "at": [
+              0.18333,
+              0.96528
+            ]
+          },
+          {
+            "id": "ambient",
+            "sample": "+21.0",
+            "at": [
+              0.8974,
+              0.96736
+            ]
+          }
+        ],
+        "icons": [
+          {
+            "kind": "pump",
+            "at": [
+              0.15833,
+              0.94722
+            ],
+            "size": [
+              37,
+              29
+            ],
+            "mirror": true
+          }
+        ],
+        "labels": [
+          {
+            "text": "km",
+            "text_mph": "mi",
+            "font": "BarlowSemiCondensed-Medium.ttf",
+            "box": [
+              0.23281,
+              0.95278,
+              0.2526,
+              0.98333
+            ],
+            "color": [
+              230,
+              231,
+              236
+            ],
+            "bold": 0.012
+          },
+          {
+            "text": "\u00b0C",
+            "text_imperial": "\u00b0F",
+            "font": "BarlowSemiCondensed-Medium.ttf",
+            "box": [
+              0.95469,
+              0.95556,
+              0.96979,
+              0.9875
+            ],
+            "color": [
+              230,
+              231,
+              236
+            ],
+            "bold": 0.012
+          }
+        ]
+      }
+    },
+    "shift_lights": {
+      "_about": "Shift lights (not on BMW's own A layout; liked as they are): a bar of 'n' slanted segments on each side over the top line, the right one the left one's mirror; they fill from the outer ends towards the middle, yellow then red ('colors'), as 'rpm' says; past the last red they flash. Unlit grey.",
+      "x": [
+        0.24479,
+        0.34375
+      ],
+      "y": [
+        0.13056,
+        0.15278
+      ],
+      "n": 10,
+      "gap": 3,
+      "slant": 4,
+      "off": [
+        52,
+        54,
+        60
+      ],
+      "flash": [
+        240,
+        36,
+        52
+      ],
+      "colors": [
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          255,
+          192,
+          24
+        ],
+        [
+          240,
+          36,
+          52
+        ],
+        [
+          240,
+          36,
+          52
+        ],
+        [
+          240,
+          36,
+          52
+        ]
+      ],
+      "rpm": {
+        "_about": "Set in the app. From 'start' the yellow segments light one by one up to 'first_red', the red ones up to 'last_red'; past 'last_red' every segment flashes red, toggling every frame (15 Hz at 30 fps).",
+        "diesel": {
+          "start": 4000,
+          "first_red": 4400,
+          "last_red": 4600
+        },
+        "petrol": {
+          "start": 5500,
+          "first_red": 6600,
+          "last_red": 7000
+        }
+      }
+    }
+  },
+  "engine": "petrol",
+  "_about_engine": "'engine' (set by the app): petrol or diesel. It picks the rev scale (8 or 6, rev_zones) and the right gauge: oil 50-150 C (petrol) or coolant 50-130 C with its middle mark at 90 (diesel), each with its own icon.",
+  "units": "metric",
+  "_about_units": "'units' (set by the app, the same setting as km/h / mph): metric or imperial. Imperial: mph scales, the right gauge in F (oil 120-210-300, coolant 120-190-260, label F), torque in lb-ft.",
+  "visible": {
+    "_about": "The part of the panel that shows on the car (the user's markup on the grid-fitted photo of the car, Nov 2026): x 215..1705, y 110..606, top corners rounded on the cowl's curve. Nothing may draw outside it.",
+    "box": [
+      0.11198,
+      0.15278,
+      0.88802,
+      0.84167
+    ],
+    "corner": 90
+  },
+  "view": {
+    "_about": "The whole layout scaled uniformly (proportions unchanged) to fit 'visible': 'auto' computes the largest scale that keeps every drawn pixel inside it and centres the drawing in it.",
+    "auto": true,
+    "margin": 0.995
+  }
+}
