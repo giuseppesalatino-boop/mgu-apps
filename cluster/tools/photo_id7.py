@@ -103,12 +103,17 @@ def fill_region(cfg, key):
     C, wC = photo_C(key)
     C = extended(C)
     B, wB = editor_line(cfg, key, 'B')                          # only to tell the track side from the fill side
-    near, far = [], []
-    for q in C:
-        b = B[int(np.argmin(np.linalg.norm(B - q, axis=1)))]
-        u = (q - b) / (np.linalg.norm(q - b) + 1e-9)
-        near.append(q - u * (wC / 2 + 1.2)); far.append(q + u * 60)
-    return np.vstack([np.array(near), np.array(far)[::-1]])
+    # C's normal (from its tangent smoothed over ~8 px), turned away from B by a majority vote: one consistent side
+    tg = np.gradient(C, axis=0)
+    k = np.ones(33) / 33
+    tg = np.stack([np.convolve(np.pad(tg[:, j], 16, mode='edge'), k, 'valid') for j in (0, 1)], 1)
+    tg /= np.linalg.norm(tg, axis=1, keepdims=True) + 1e-9
+    nC = np.stack([-tg[:, 1], tg[:, 0]], 1)
+    away = np.array([np.dot(nC[i], C[i] - B[int(np.argmin(np.linalg.norm(B - C[i], axis=1)))]) for i in range(len(C))])
+    nC *= 1 if np.median(away) > 0 else -1
+    near = C - nC * (wC / 2 + 2.2)
+    far = C + nC * 60
+    return np.vstack([near, far[::-1]])
 
 
 def label_mask(key, photo):
@@ -117,8 +122,8 @@ def label_mask(key, photo):
     v = photo.min(-1)
     for x0, y0, x1, y1 in LABELS[key]:
         sl = (slice(int(y0), int(np.ceil(y1))), slice(int(x0), int(np.ceil(x1))))
-        m[sl] = np.clip((v[sl] - 90) / 80, 0, 1)
-    return np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3))).astype(np.float32) / 255
+        m[sl] = np.clip((v[sl] - 150) / 90, 0, 1)                # the glyph's own white only (its fringe follows the fill)
+    return m
 
 
 def bar_mask(key, photo):
@@ -155,6 +160,26 @@ def bar_mask(key, photo):
     return m, src
 
 
+def mid_tick(cfg, key, photo, reg):
+    """The 1/2 (fuel) / 100 C (temperature) line across the dark track, from B to C: live (shown under the level only).
+    Its band: the level line at the mid value, from C back across the track to B, 4 px wide; static there shows the
+    track's own colour (the photo's track next to it, white marks left out)."""
+    v = 0.5
+    p, d = level(cfg, key, v)
+    B, wB = editor_line(cfg, key, 'B')
+    b = B[int(np.argmin(np.linalg.norm(B - p, axis=1)))]
+    L = float(np.linalg.norm(b - p)) - (wB / 2 + 2.0)            # stops short of B: its tick there stays
+    back = -d if np.dot(b - p, d) < 0 else d
+    n = np.array([-d[1], d[0]])
+    a0, a1 = p - back * 1.0, p + back * L
+    band = poly_mask([tuple(a0 + n * 2.2), tuple(a1 + n * 2.2), tuple(a1 - n * 2.2), tuple(a0 - n * 2.2)])
+    band = band * (1 - np.clip(reg, 0, 1))
+    ring = poly_mask([tuple(a0 + n * 6), tuple(a1 + n * 6), tuple(a1 - n * 6), tuple(a0 - n * 6)]) - band
+    sel = (ring > 0.9) & (photo.max(-1) < 90) & (reg < 0.1)
+    track = np.median(photo[sel], 0) if sel.any() else np.zeros(3)
+    return band, track
+
+
 def build(cfg):
     photo = load_photo()
     X, Y = np.meshgrid(np.arange(W) + 0.5, np.arange(H) + 0.5)
@@ -162,6 +187,18 @@ def build(cfg):
     parts = {}
     for key in ('fuel', 'temp'):
         reg = poly_mask(fill_region(cfg, key))
+        Cp, wCp = photo_C(key)                                  # C itself, whole length: live
+        cm = Image.new('L', (W * 4, H * 4), 0)
+        ImageDraw.Draw(cm).line([(x * 4, y * 4) for x, y in extended(Cp)], fill=255, width=int((wCp + 6.0) * 4), joint='curve')
+        cmask = np.asarray(cm.resize((W, H), Image.BOX)).astype(np.float32) / 255
+        reg = np.maximum(reg, cmask)
+        # the coloured marks (hot red, cold blue, the reserve) stay the photo's: out of the region, outside the bar's box
+        r_ = photo[..., 0] - np.maximum(photo[..., 1], photo[..., 2]); b_ = photo[..., 2] - photo[..., 0]
+        col = ((r_ > 30) | (b_ > 30)).astype(np.float32)
+        bx0, by0, bx1, by1 = BAR_BOX[key]
+        col[by0 - 14:by1 + 14, bx0 - 14:bx1 + 14] = 0             # the bar and its reddish glow are live
+        col = np.asarray(Image.fromarray((col * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(5))).astype(np.float32) / 255
+        reg = np.maximum(reg * (1 - col), cmask)             # C's bluish fringe is not a mark
         lab = label_mask(key, photo)
         bar, bsrc = bar_mask(key, photo)
         # 'empty': what the photo shows in the region above its level (temperature, above 106 C), as a flat colour
@@ -169,9 +206,13 @@ def build(cfg):
         rt = poly_mask(fill_region(cfg, 'temp'))
         above = (rt > 0.9) & (below(pt, dt, X, Y) < 0.1) & (photo.max(-1) < 60)
         empty = np.median(photo[above], 0) if above.any() else np.zeros(3)
-        cut = np.clip(np.maximum(reg, bar * (photo[..., 0] > 60)) - lab, 0, 1)[..., None]
+        barc = np.asarray(Image.fromarray((np.clip(bar, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3))).astype(np.float32) / 255
+        cut = np.clip(np.maximum(reg, barc) - lab, 0, 1)[..., None]
         static = static * (1 - cut) + empty * cut
-        parts[key] = {'reg': reg, 'lab': lab, 'bar': bar, 'bsrc': bsrc, 'empty': empty}
+        band, track = mid_tick(cfg, key, photo, reg)
+        bc = np.clip(band - lab, 0, 1)[..., None]
+        static = static * (1 - bc) + track * bc
+        parts[key] = {'reg': np.maximum(reg, band), 'lab': lab, 'bar': bar, 'bsrc': bsrc, 'empty': empty}
     return photo, static, parts
 
 
