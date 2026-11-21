@@ -374,9 +374,10 @@
         ]
       },
       "bar": {
-        "len": 64,
-        "thick": 9.5,
-        "taper": 0.8
+        "len": 66,
+        "thick": 9.0,
+        "taper": 0.25,
+        "fade": 0.45
       },
       "reserve": {
         "_about": "the red reserve mark in the track under the '0' (photo: x 236-300, a step at 262)",

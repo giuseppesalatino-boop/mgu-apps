@@ -253,20 +253,25 @@ def draw_fuel_level(img, cfg, v):
         arr = np.asarray(img).astype(np.float32)
         arr[..., :3] += (255 - arr[..., :3]) * (la * tr['fill_gain'])[..., None] * (arr[..., :3].mean(-1, keepdims=True) > 30)
         img = Image.fromarray(np.clip(arr + 0.5, 0, 255).astype(np.uint8), 'RGBA')
-    # the bar: along the level line from C, thick, its far end tapering and darker
+    # the bar: along the level line from the rail (B's inner edge), thick, its far end softening out (close-up photo)
     bl, bt = el['bar']['len'], el['bar']['thick']
     n = np.array([-dvec[1], dvec[0]])
+    q = np.array(nearest(offset(B, el['B_width'] / 2), p)[1])
+    start = np.array(p) + dvec * float(np.dot(q - np.array(p), dvec))
+    bl += float(np.linalg.norm(np.array(p) - start))
     big = Image.new('RGBA', (img.size[0] * SS, img.size[1] * SS), (0, 0, 0, 0))
     bd = ImageDraw.Draw(big)
-    steps = 40
+    steps = 60
     c0, c1 = np.array(col['bar'], float), np.array(col['bar_end'], float)
+    fo = el['bar'].get('fade', 0.4)
     for s in range(steps):
         t0, t1 = s / steps, (s + 1) / steps
         half = bt / 2 * (1 - el['bar'].get('taper', 0.35) * t1 ** 2)
-        a0, a1 = np.array(p) + dvec * bl * t0, np.array(p) + dvec * bl * t1
+        a0, a1 = start + dvec * bl * t0, start + dvec * bl * t1
         quad = [a0 + n * half, a1 + n * half, a1 - n * half, a0 - n * half]
-        c = tuple(int(round(v_)) for v_ in c0 + (c1 - c0) * t1 ** 1.5) + (255,)
-        bd.polygon([(q[0] * SS, q[1] * SS) for q in quad], fill=c)
+        al = 1 - float(g.smooth(1 - fo, 1.0, (t0 + t1) / 2))
+        c = tuple(int(round(v_)) for v_ in c0 + (c1 - c0) * t1 ** 1.5) + (int(round(255 * al)),)
+        bd.polygon([(q_[0] * SS, q_[1] * SS) for q_ in quad], fill=c)
     img.alpha_composite(big.resize(img.size, Image.LANCZOS))
     return img
 
