@@ -629,6 +629,51 @@ def measure_center(img):
             'line': [{'poly': p, 'color': col(p)} for p in sorted(line, key=lambda p: p[0][0])]}
 
 
+def vectorize_x10(img10, origin, box, layers, key, blur=3):
+    """Colour layers of a region of a 10x enlargement (display grid x 10) as polygons in display px: each layer is a
+    mask key(img) >= level, traced row by row at 10x (each white run linked to the overlapping run above it, every
+    chain an outline: left edges down, right edges up), simplified to 0.05 px; painted in order (lowest level first)
+    they rebuild the photo's shading. Returns [{level, color, polys}]."""
+    from PIL import ImageFilter
+    ox, oy = origin
+    x0, y0, x1, y1 = [int(round(v * 10)) for v in ((box[0] - ox), (box[1] - oy), (box[2] - ox), (box[3] - oy))]
+    sub = Image.fromarray(img10[y0:y1, x0:x1].astype(np.uint8)).filter(ImageFilter.GaussianBlur(blur))
+    a = np.asarray(sub).astype(np.float32)
+    v = key(a)
+    out = []
+    for i, lv in enumerate(layers):
+        m = v >= lv
+        nxt = layers[i + 1] if i + 1 < len(layers) else 1e9
+        band = m & (v < nxt)
+        if not band.any():
+            continue
+        col = np.median(a[band], 0).round().astype(int).tolist()
+        shapes, open_ = [], []
+        for r in range(m.shape[0]):
+            e = np.flatnonzero(np.diff(np.r_[0, m[r].astype(int), 0]))
+            runs = [(e[j], e[j + 1]) for j in range(0, len(e), 2) if e[j + 1] - e[j] >= 2]
+            nxt_open = []
+            for r0, r1 in runs:
+                hit = next((sh for sh in open_ if sh['R'][-1][0] > r0 and sh['L'][-1][0] < r1 and not sh.get('t')), None)
+                if hit is None:
+                    hit = {'L': [], 'R': []}; shapes.append(hit)
+                hit['L'].append((r0, r)); hit['R'].append((r1, r)); hit['t'] = True
+                nxt_open.append(hit)
+            for sh in nxt_open:
+                sh['t'] = False
+            open_ = nxt_open
+        polys = []
+        for sh in shapes:
+            if len(sh['L']) < 3:
+                continue
+            L = sh['L'] + [(sh['L'][-1][0], sh['L'][-1][1] + 1)]
+            R = sh['R'] + [(sh['R'][-1][0], sh['R'][-1][1] + 1)]
+            pts = simplify(L, 0.5) + simplify(R, 0.5)[::-1]
+            polys.append([[round(ox + (x0 + x) / 10, 2), round(oy + (y0 + y) / 10, 2)] for x, y in pts])
+        out.append({'level': lv, 'color': col, 'polys': polys})
+    return out
+
+
 def main():
     what = sys.argv[1] if len(sys.argv) > 1 else 'blade'
     if what == 'revs':                                        # trace_id7.py revs id7/Corsa: into its config.json
@@ -658,6 +703,22 @@ def main():
         cfg['elements']['center'] = dict(c, **{k: v for k, v in old.items() if k.startswith('_') or k not in c})
         json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
         print('center -> ' + os.path.relpath(path, ROOT))
+    if what == 'reserve10':                                   # trace_id7.py reserve10 id7/Strada id7/Corsa
+        img10 = np.asarray(Image.open(os.path.join(ROOT, 'design', 'refs', 'id7', 'M8_fuel_x10.png')).convert('RGB')).astype(np.float32)
+        lay = vectorize_x10(img10, (190, 400), (298, 558, 366, 592), [8, 16, 24] + list(range(32, 250, 12)),
+                            key=lambda a: np.where(a[..., 0] - a[..., 1:].max(-1) > np.minimum(25, a[..., 0] * 0.5), a[..., 0], 0))
+        for lo_ in sys.argv[2:]:
+            path = os.path.join(ROOT, 'layouts', lo_, 'config.json')
+            cfg = json.load(open(path, encoding='utf-8'))
+            r = cfg['elements']['fuel']['reserve']
+            r['layers'] = [{'level': l_['level'], 'color': l_['color'],
+                            'polys': [[[round(x / W, 6), round(y / H, 6)] for x, y in p] for p in l_['polys']]} for l_ in lay]
+            r['_layers'] = ("the reserve mark vectorized on the 10x enlargement of the photo (M8_fuel_x10.png, display grid "
+                            "x 10 from x 190, y 400): red-channel layers (red over green/blue by 25+) at levels 40..235, "
+                            "each painted flat in its median colour, lowest first: the bright front edges, the darker top "
+                            "face and its shading come out as on the photo")
+            json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
+            print('reserve layers -> ' + lo_, [len(l_['polys']) for l_ in lay])
     if what == 'blade':
         axis = float(sys.argv[2]) if len(sys.argv) > 2 else None
         img = load(axis)

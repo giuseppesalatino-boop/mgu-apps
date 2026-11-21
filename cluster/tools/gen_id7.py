@@ -69,8 +69,8 @@ def interp(stops, v):
 
 # ---------------------------------------------------------------- the fuel gauge
 
-def fuel_paths(cfg):
-    el = cfg['elements']['fuel']
+def fuel_paths(cfg, key='fuel'):
+    el = cfg['elements'][key]
     W, H = cfg['grid']
     A = densify(px(cfg, el['A']), step=0.75)
     B_corner_px = px(cfg, [el['B_corner']])[0]
@@ -84,9 +84,9 @@ def fuel_paths(cfg):
     return A, B, C
 
 
-def level_point(cfg, C, v):
+def level_point(cfg, C, v, key='fuel'):
     """Where level v (0..1) meets C, and its line's direction across the fill."""
-    el = cfg['elements']['fuel']
+    el = cfg['elements'][key]
     y = interp(el['levels']['y'], v)
     W = cfg['grid'][0]
     lv = el['levels']
@@ -121,16 +121,17 @@ def _strip(d, pts, w0, w1, c0, c1, steps=None):
         d.polygon([(q[0] * SS, q[1] * SS) for q in quad], fill=c)
 
 
-def draw_fuel_static(img, cfg, trails=True, level=None):
+def draw_fuel_static(img, cfg, trails=True, level=None, key='fuel'):
     """The fixed part (supersampled canvas): the reserve, the thin line A, the thicker line B with its hook and its thin
     end, the triangles on B and the grey trails fading towards the labels."""
-    el = cfg['elements']['fuel']
+    el = cfg['elements'][key]
     W, H = cfg['grid']
     col = el['colors']
-    A, B, C = fuel_paths(cfg)
+    A, B, C = fuel_paths(cfg, key)
     d = ImageDraw.Draw(img)
-    # the reserve mark, a horizontal gradient
+    # the reserve mark, a horizontal gradient (unless traced in layers: then drawn below, over the lines)
     rp = px(cfg, el['reserve']['poly'])
+    layered = bool(el['reserve'].get('layers'))
     m = Image.new('L', img.size, 0)
     ImageDraw.Draw(m).polygon([(x * SS, y * SS) for x, y in rp], fill=255)
     xs = [p[0] for p in rp]
@@ -140,7 +141,8 @@ def draw_fuel_static(img, cfg, trails=True, level=None):
     y0, y1 = int(min(p[1] for p in rp) * SS) - 2, int(max(p[1] for p in rp) * SS) + 2
     band = np.repeat(c0 + (c1 - c0) * f, y1 - y0, axis=0)
     fill = Image.fromarray(np.clip(band + 0.5, 0, 255).astype(np.uint8), 'RGB').convert('RGBA')
-    img.paste(fill, (0, y0), m.crop((0, y0, img.size[0], y1)))
+    if not layered:
+        img.paste(fill, (0, y0), m.crop((0, y0, img.size[0], y1)))
     lc = tuple(col['line'])
     tr = el['trail']
     for t in (el.get('trails', []) if trails else []):         # grey, fading out towards the label
@@ -156,15 +158,24 @@ def draw_fuel_static(img, cfg, trails=True, level=None):
         hw = el['B_width'] / 2 * np.linspace(1, 0.12, len(pts))[:, None]
         poly = list(pts + nn * hw) + list((pts - nn * hw)[::-1])
         d.polygon([(x * SS, y * SS) for x, y in poly], fill=lc)
+    bz = el.get('B_zone')
+    if bz:                                                      # B's top part in the zone's colour (temp: hot)
+        seg = [q for q in B if q[1] <= bz['y_max'] * H]
+        if len(seg) > 1:
+            _line(d, seg, el['B_width'], tuple(bz['color']))
     tp = el.get('top')
     if tp:                                                      # the '1': the wedge towards the label and the barb
         _strip(d, px(cfg, tp['wedge']), tp['w0'], tp['w1'], tuple(tp['c0']), tuple(tp['c1']))
-        _line(d, px(cfg, tp['barb']), tp['barb_width'], lc)
+        _line(d, px(cfg, tp['barb']), tp['barb_width'], tuple(tp.get('barb_color', lc)))
     sh = el['reserve'].get('shade')
-    if sh:
+    if layered:                                                 # the 10x vector trace: flat layers, lowest first
+        for lay in el['reserve']['layers']:
+            for poly in lay['polys']:
+                d.polygon([(x * SS, y * SS) for x, y in px(cfg, poly)], fill=tuple(lay['color']))
+    elif sh:
         d.polygon([(x * SS, y * SS) for x, y in px(cfg, sh['pts'])], fill=tuple(sh['color']))
     for t in el.get('triangles', []):                           # on B's inner side, apex towards C
-        p, dvec = level_point(cfg, C, t['at'])
+        p, dvec = level_point(cfg, C, t['at'], key)
         p_arr = np.array(p, dtype=float)
         _, q = nearest(B, p)
         q_arr = np.array(q, dtype=float)
@@ -192,11 +203,11 @@ def draw_fuel_static(img, cfg, trails=True, level=None):
             d.polygon([(x * SS, y * SS) for x, y in tri], fill=lc)
 
 
-def _rp_mask(cfg):
+def _rp_mask(cfg, key='fuel'):
     """The reserve mark's shape at grid size (the track and C keep off it)."""
     W, H = cfg['grid']
     m = Image.new('L', (W * SS, H * SS), 0)
-    ImageDraw.Draw(m).polygon([(x * SS, y * SS) for x, y in px(cfg, cfg['elements']['fuel']['reserve']['poly'])], fill=255)
+    ImageDraw.Draw(m).polygon([(x * SS, y * SS) for x, y in px(cfg, cfg['elements'][key]['reserve']['poly'])], fill=255)
     return m.resize((W, H), Image.BOX)
 
 
@@ -206,8 +217,8 @@ def _below(cfg, p, dvec, X, Y):
     return np.clip(s + 0.5, 0, 1)
 
 
-def draw_fuel_labels(img, cfg):
-    el = cfg['elements']['fuel']
+def draw_fuel_labels(img, cfg, key='fuel'):
+    el = cfg['elements'][key]
     W, H = cfg['grid']
     lb = el['labels']
     for it in lb['items']:
@@ -221,14 +232,14 @@ def draw_fuel_labels(img, cfg):
     g.draw_pump(img, ic['at'][0] * W, ic['at'][1] * H, ic['size'][0], ic['size'][1], lb['color'])
 
 
-def draw_fuel_level(img, cfg, v):
+def draw_fuel_level(img, cfg, v, key='fuel'):
     """The live part: the fill lit from C up to level v, and the level bar there."""
-    el = cfg['elements']['fuel']
+    el = cfg['elements'][key]
     W, H = cfg['grid']
     col = el['colors']
-    A, B, C = fuel_paths(cfg)
+    A, B, C = fuel_paths(cfg, key)
     v = float(np.clip(v, 0, 1))
-    p, dvec = level_point(cfg, C, v)
+    p, dvec = level_point(cfg, C, v, key)
     i = nearest(C, p)[0]
     far = 120
     top = tuple(np.array(p) + dvec * far)
@@ -245,6 +256,9 @@ def draw_fuel_level(img, cfg, v):
     if sy:                                                      # the lit band widens towards the bottom
         dist = dist / np.interp(Y, [s[0] for s in sy], [s[1] for s in sy])
     k = np.interp(dist, [s[0] for s in st], [s[1] for s in st])
+    gy = el['fill'].get('gain_y')
+    if gy:                                                      # dimmer rows (temp: towards the bottom)
+        k = k * np.interp(Y, [s[0] for s in gy], [s[1] for s in gy])
     fx0, fx1 = el['fill']['fade_x'][0] * W, el['fill']['fade_x'][1] * W
     k = k * np.clip((fx1 - X) / (fx1 - fx0), 0, 1) * m * _below(cfg, p, dvec, X, Y)
     # the grey track between B and C and C itself, both only under the level
@@ -261,7 +275,7 @@ def draw_fuel_level(img, cfg, v):
     XX, YY = np.meshgrid(np.arange(W) + 0.5, np.arange(H) + 0.5)
     fx0c, fx1c = el['C_fade'][0] * W, el['C_fade'][1] * W
     lay[..., 3] *= _below(cfg, p, dvec, XX, YY) * np.clip((fx1c - XX) / (fx1c - fx0c), 0, 1)
-    lay[..., 3] *= 1 - np.asarray(_rp_mask(cfg)).astype(np.float32) / 255
+    lay[..., 3] *= 1 - np.asarray(_rp_mask(cfg, key)).astype(np.float32) / 255
     img.alpha_composite(Image.fromarray(np.clip(lay + 0.5, 0, 255).astype(np.uint8), 'RGBA'))
     arr = np.asarray(img).astype(np.float32)
     sub = arr[y0:y1, x0:x1, :3]
@@ -274,7 +288,7 @@ def draw_fuel_level(img, cfg, v):
         for t in el.get('triangles', []):
             if t['at'] >= v:
                 continue
-            q, dq = level_point(cfg, C, t['at'])
+            q, dq = level_point(cfg, C, t['at'], key)
             _line(ld, [q, tuple(np.array(q) + dq * tr['fill_len'])], tr['width'], 255)
         la = np.asarray(lm.resize((W, H), Image.BOX)).astype(np.float32) / 255
         arr = np.asarray(img).astype(np.float32)
@@ -303,6 +317,84 @@ def draw_fuel_level(img, cfg, v):
         c = tuple(int(round(v_)) for v_ in c0 + (c1 - c0) * t1 ** 1.5) + (int(round(255 * al)),)
         bd.polygon([(q_[0] * SS, q_[1] * SS) for q_ in quad], fill=c)
     img.alpha_composite(big.resize(img.size, Image.LANCZOS))
+    return img
+
+
+# ---------------------------------------------------------------- the temperature gauge (Corsa): the fuel gauge's mirror
+
+def mirror(img, axis, back=False):
+    """img mirrored about x = axis (an integer or half-integer: whole-pixel shift, lossless): x -> 2 axis - x."""
+    sc = img.size[0] / 1920.0                                   # grid or supersampled canvas
+    sh = int(round((2 * axis - 1920) * sc))
+    a = np.asarray(img)
+    a = np.roll(a, -sh, axis=1)[:, ::-1] if back else np.roll(a[:, ::-1], sh, axis=1)
+    return Image.fromarray(np.ascontiguousarray(a), img.mode)
+
+
+def draw_temp_static(img, cfg):
+    """The fuel gauge's drawing in the mirrored frame (temp's lines stored there), mirrored onto the right."""
+    W, H = cfg['grid']
+    el = cfg['elements']['temp']
+    big = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+    draw_fuel_static(big, cfg, key='temp')
+    big = mirror(big, el['mirror_axis'])
+    img.alpha_composite(big.resize((W, H), Image.LANCZOS))
+
+
+def draw_temp_labels(img, cfg):
+    """50 / 100 / 150 and the icon (°C and the oil can), on the display as measured (not mirrored)."""
+    W, H = cfg['grid']
+    lb = cfg['elements']['temp']['labels']
+    for it in lb['items']:
+        x0, y0, x1, y1 = it['box'][0] * W, it['box'][1] * H, it['box'][2] * W, it['box'][3] * H
+        tmp = Image.new('RGBA', (900, 300), (0, 0, 0, 0))
+        g.draw_number(tmp, it['text'], 20, 150, 200, 31.5, tuple(lb['color']), align='left')
+        part = tmp.crop(tmp.getbbox())
+        big = Image.new('RGBA', (int(x1 - int(x0) + 2) * SS, int(y1 - int(y0) + 2) * SS), (0, 0, 0, 0))
+        big.alpha_composite(part.resize((int(round((x1 - x0) * SS)), int(round((y1 - y0) * SS))), Image.LANCZOS),
+                            (int(round((x0 - int(x0)) * SS)), int(round((y0 - int(y0)) * SS))))
+        img.alpha_composite(big.resize((big.width // SS, big.height // SS), Image.LANCZOS), (int(x0), int(y0)))
+    u = lb.get('unit')
+    if u:
+        _text_in_box(img, cfg, u['text'], u['box'], u['font'], u['color'])
+    ic = lb.get('icon')
+    if ic:                                                      # the oil can fitted to its traced box (the drawing
+        x0, y0, x1, y1 = ic['box'][0] * W, ic['box'][1] * H, ic['box'][2] * W, ic['box'][3] * H   # spans 1..45.5 x -3..25.5
+        kx, ky = (x1 - x0) / 44.5, (y1 - y0) / 28.5                                                   # of its 48 x 32 cell)
+        g.draw_oil(img, x0 - 1 * kx, y0 + 3 * ky, 48 * kx, 32 * ky, tuple(ic['color']))
+
+
+def _text_in_box(img, cfg, text, box, font, color):
+    """Text (a project font) stretched into its traced box."""
+    from PIL import ImageFont
+    W, H = cfg['grid']
+    x0, y0, x1, y1 = box[0] * W, box[1] * H, box[2] * W, box[3] * H
+    f = ImageFont.truetype(os.path.join(HERE, 'fonts-src', font), 400)
+    tmp = Image.new('L', (2400, 700), 0)
+    ImageDraw.Draw(tmp).text((50, 50), text, font=f, fill=255)
+    part = tmp.crop(tmp.getbbox())
+    m = Image.new('L', (int(x1 - int(x0) + 2) * SS, int(y1 - int(y0) + 2) * SS), 0)
+    m.paste(part.resize((int(round((x1 - x0) * SS)), int(round((y1 - y0) * SS))), Image.LANCZOS),
+            (int(round((x0 - int(x0)) * SS)), int(round((y0 - int(y0)) * SS))))
+    m = m.resize((m.width // SS, m.height // SS), Image.LANCZOS)
+    lay = Image.new('RGBA', m.size, tuple(color) + (0,))
+    lay.putalpha(m)
+    img.alpha_composite(lay, (int(x0), int(y0)))
+
+
+def draw_temp_level(img, cfg, t_c):
+    """The live fill at t_c (°C): the fuel gauge's level drawing in the mirrored frame, then the rail over it."""
+    W, H = cfg['grid']
+    el = cfg['elements']['temp']
+    lo, hi = el['scale']
+    v = float(np.clip((t_c - lo) / (hi - lo), 0, 1))
+    m = mirror(img, el['mirror_axis'])
+    m = draw_fuel_level(m, cfg, v, key='temp')
+    rail = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+    draw_fuel_static(rail, cfg, trails=False, level=v, key='temp')
+    m.alpha_composite(rail.resize((W, H), Image.LANCZOS))
+    img = mirror(m, el['mirror_axis'], back=True)
+    draw_temp_labels(img, cfg)
     return img
 
 
@@ -636,10 +728,15 @@ def build_static(cfg):
         draw_center_unit(img, cfg)
     if 'fuel' in el:
         draw_fuel_labels(img, cfg)
+    if 'temp' in el:
+        draw_temp_static(img, cfg)
+        draw_temp_labels(img, cfg)
     return img
 
 
 def draw_dynamic(img, cfg, tel):
+    if 'temp' in tel and 'temp' in cfg['elements']:
+        img = draw_temp_level(img, cfg, tel['temp'])
     if 'center' in cfg['elements']:
         if 'gear' in tel:
             draw_center_value(img, cfg, 'gear', str(tel['gear']))
@@ -669,6 +766,8 @@ def photo_tel(cfg):
     tel = {'fuel': 1.0}
     if 'revs' in el:
         tel['rpm'] = photo_rpm(cfg)
+    if 'temp' in el:
+        tel['temp'] = el['temp'].get('photo_value', 105)
     if 'center' in el:
         tel['gear'] = el['center']['gear']['text']; tel['speed'] = el['center']['speed']['text']
     return tel
