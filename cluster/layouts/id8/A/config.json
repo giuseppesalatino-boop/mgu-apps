@@ -1171,7 +1171,9 @@
     "map_window": {
       "_about": "The centre slot as a map (cfg 'center' = 'map'): a see-through window in our layer where the BMW map (KOMBI slot 0x100, under us) shows. Hypothesis until measured on the car: the whole central panel, up to the speed and gear inserts (its notches) without entering them, inset 8 px for an even blue rim.",
       "of": "panel",
-      "inset": 8
+      "inset": 8,
+      "_about_host": "Phone maps (Waze, CarPlay, Google Maps via Waze on Cluster): our panel scene hosts the 'map' target (1088x480) with cluster-render's 'host' message, the video under our frame and seen only through this window. host = the window's bounding rect on the panel target after the fit (px of 1920x720); src = the part of the map shown there, full width and the middle rows, so the map keeps its proportions (no stretch).",
+      "host": {"x": 523, "y": 176, "w": 901, "h": 318, "src_x": 0, "src_y": 48, "src_w": 1088, "src_h": 384}
     },
     "tray": {
       "_about": "The stylised blue trapezoid under the bottom bar, at the centre: 4 slanted segments split by thin black cuts (the first '\\', the others '/'), the whole sheared left as on the photo. Edges fitted on the photo's rows y 664-703 (subpixel, blue channel), top 648.5 / bottom 705.5. Vertical gradient sampled at x 820-1080.",
