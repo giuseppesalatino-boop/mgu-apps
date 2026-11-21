@@ -272,6 +272,78 @@ def live(cfg, photo, static, parts, tel):
     return out
 
 
+# ---------------------------------------------------------------- the rev counter blades (same method)
+
+def blade_frame(cfg, side):
+    """A blade's band between its lit edge E and its inner line I, row by row: x of E and I at each y, the y of each
+    rev value (0..8), the photographed bar's rows and the zero line (all measured on the photo, config 'revs')."""
+    b = cfg['elements']['revs'][side]
+    E = np.array(b['E']) * [W, H]; I = np.array(b['I']) * [W, H]
+    oe, oi = np.argsort(E[:, 1]), np.argsort(I[:, 1])
+    vy = np.array(b['values_y']) * H
+    return {'E': (E[oe, 1], E[oe, 0]), 'I': (I[oi, 1], I[oi, 0]), 'vy': vy, 'bar': b['fill']['bar'],
+            'zero': b['zero_line']['y'][0], 'top': max(E[:, 1].min(), I[:, 1].min()) + 2}
+
+
+def blade_uv(F, X, Y):
+    xe = np.interp(Y, *F['E']); xi = np.interp(Y, *F['I'])
+    return (X - xe) / (xi - xe)
+
+
+def blade_y(F, rpm):
+    """y of the bar's centre at rpm (x1000/min) on this blade."""
+    return float(np.interp(rpm, np.arange(len(F['vy'])), F['vy']))
+
+
+def blade_parts(cfg, photo):
+    X, Y = np.meshgrid(np.arange(W) + 0.5, np.arange(H) + 0.5)
+    out = {}
+    for side in ('left', 'right'):
+        F = blade_frame(cfg, side)
+        u = blade_uv(F, X, Y)
+        wd = np.abs(np.interp(Y, *F['I']) - np.interp(Y, *F['E']))
+        g = 6.0 / np.maximum(wd, 1)                             # the dark gap between O and E (its red tint moves too)
+        gi = 5.0 / np.maximum(wd, 1)                            # ... and the red tint past I
+        inside = (u > -g) & (u < 1.0 + gi) & (Y > F['top']) & (Y < F['zero'] - 0.5)
+        band = np.clip(np.minimum(u + g, 1 + gi - u) * wd - 0.8, 0, 1) * inside
+        r_ = photo[..., 0] - photo[..., 2]
+        zones = (r_ > 60) & (u < 0.2) & (Y < F['vy'][6])        # the rev zones along O (red / yellow): static
+        ticks = ((photo.min(-1) > 140) & (u < 0.15)) | zones    # O's ticks reaching in stay as photographed
+        ticks = np.asarray(Image.fromarray((ticks * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3))) > 0
+        band = band * ~ticks
+        out[side] = {'F': F, 'band': band.astype(np.float32), 'u': u}
+    return out
+
+
+def blade_live(photo, out, parts, rpm, photo_rpm):
+    """The band at rpm from the photo's own pixels, shifted along the blade (same u across it):
+    above the bar the photo's glow then its plain body; the bar; below it the grey block, its foot as photographed."""
+    X, Y = np.meshgrid(np.arange(W) + 0.5, np.arange(H) + 0.5)
+    for side, P in parts.items():
+        F, u, band = P['F'], P['u'], P['band']
+        y0 = (F['bar'][0] + F['bar'][1]) / 2                    # the photographed bar's centre
+        yt = blade_y(F, rpm) - (blade_y(F, photo_rpm) - y0)     # the target bar's centre
+        dy = Y - yt                                             # signed distance from the bar (down +)
+        foot = F['zero'] - Y                                    # distance above the zero line
+        block_ph = F['zero'] - y0                               # the photo's bar-to-zero distance
+        glow = 95.0                                             # the photo's glow height above its bar
+        body_y = y0 - glow - 6                                  # a body row above the glow, on the photo
+        top_end = y0 + 8.0                                      # bar + the block's white top frame, as photographed
+        m0, m1 = y0 + 9.0, F['zero'] - 10.0                     # the block's plain middle rows on the photo
+        span = max(1.0, m1 - m0)
+        pp = np.mod(dy - 9.0, 2 * span)                         # ping-pong over the middle rows: no seams
+        mid = m0 + np.where(pp < span, pp, 2 * span - pp)
+        ys = np.where(dy < -glow, body_y,                       # plain body: a body row above the photo's glow
+             np.where(dy < top_end - y0, y0 + dy,               # glow, bar, the block's top frame: shifted
+             np.where(foot < 10.0, F['zero'] - foot,            # the block's foot: as photographed
+                      mid)))
+        xs = np.interp(ys, *F['E']) + u * (np.interp(ys, *F['I']) - np.interp(ys, *F['E']))
+        src = np.stack([_bil(photo[..., k], xs - 0.5, ys - 0.5) for k in range(3)], -1)
+        a = band[..., None]
+        out = out * (1 - a) + src * a
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--sim')
@@ -285,6 +357,10 @@ def main():
         for kv in a.sim.split(','):
             k, v = kv.split('='); tel[k] = float(v)
     img = live(cfg, photo, static, parts, tel)
+    bp = blade_parts(cfg, photo)
+    sys.path.insert(0, HERE)
+    pr = G.photo_rpm(cfg)
+    img = blade_live(photo, img, bp, tel.get('rpm', pr), pr)
     name = 'id7_Corsa_photo_live.png'
     Image.fromarray(np.clip(img + 0.5, 0, 255).astype(np.uint8)).save(os.path.join(out_dir, name))
     print('design/out/id7_Corsa_photo_static.png, design/out/' + name)
