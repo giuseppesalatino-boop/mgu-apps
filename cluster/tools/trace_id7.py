@@ -629,6 +629,31 @@ def measure_center(img):
             'line': [{'poly': p, 'color': col(p)} for p in sorted(line, key=lambda p: p[0][0])]}
 
 
+PHOTO = os.path.join(ROOT, 'design', 'refs', 'bmw_press', 'P90346920_highRes_m-view-05-2019.jpg')
+PLACE = (0.3104, 39.1, -312.7)                                 # display = photo * s + (ox, oy)
+
+
+def make_x10(box, name):
+    """The photo resampled straight onto the display grid x 10 over box (display px): refs/id7/<name>.png."""
+    s_, ox, oy = PLACE
+    X0, Y0, X1, Y1 = box
+    src = Image.open(PHOTO).convert('RGB')
+    px0, py0 = (X0 - ox) / s_, (Y0 - oy) / s_
+    px1, py1 = (X1 - ox) / s_, (Y1 - oy) / s_
+    c0x, c0y = int(px0) - 2, int(py0) - 2
+    crop = src.crop((c0x, c0y, int(px1) + 3, int(py1) + 3))
+    a_ = 1 / (s_ * 10)
+    big = crop.transform(((X1 - X0) * 10, (Y1 - Y0) * 10), Image.AFFINE, (a_, 0, px0 - c0x, 0, a_, py0 - c0y),
+                         resample=Image.BICUBIC)
+    out = os.path.join(ROOT, 'design', 'refs', 'id7', name + '.png')
+    big.save(out)
+    return out
+
+
+def load_x10(name):
+    return np.asarray(Image.open(os.path.join(ROOT, 'design', 'refs', 'id7', name + '.png')).convert('RGB')).astype(np.float32)
+
+
 def vectorize_x10(img10, origin, box, layers, key, blur=3):
     """Colour layers of a region of a 10x enlargement (display grid x 10) as polygons in display px: each layer is a
     mask key(img) >= level, traced row by row at 10x (each white run linked to the overlapping run above it, every
@@ -703,6 +728,190 @@ def main():
         cfg['elements']['center'] = dict(c, **{k: v for k, v in old.items() if k.startswith('_') or k not in c})
         json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
         print('center -> ' + os.path.relpath(path, ROOT))
+    if what == 'fill10':                                      # trace_id7.py fill10 id7/Strada id7/Corsa
+        sys.path.insert(0, HERE)
+        import gen_id7 as G
+        from PIL import ImageDraw as IDr
+        path0 = os.path.join(ROOT, 'layouts', sys.argv[2], 'config.json')
+        cfg = json.load(open(path0, encoding='utf-8'))
+        el = cfg['elements']['fuel']
+        A_, B_, C_ = G.fuel_paths(cfg)
+        p_, d_ = G.level_point(cfg, C_, 1.0)
+        top = (p_[0] + d_[0] * 120, p_[1] + d_[1] * 120)
+        poly = C_ + [(C_[-1][0] + 30, C_[-1][1] - 4), top]
+        ox, oy = 190, 400
+        img10 = load_x10('M8_fuel_x10').copy()
+        h10, w10 = img10.shape[:2]
+        m = Image.new('L', (w10, h10), 0)
+        IDr.Draw(m).polygon([((x - ox) * 10, (y - oy) * 10) for x, y in poly], fill=255)
+        m = np.asarray(m) > 0
+        # the labels and the level bar out: each of their rows filled in from its two sides
+        cut = [(257.5, 428.5, 270.5, 449.5), (268.5, 490.5, 312.5, 511.5), (322.5, 535.5, 343.5, 557.5)]
+        R_, G_, B_c = img10[..., 0], img10[..., 1], img10[..., 2]
+        redm = (R_ - np.maximum(G_, B_c)) > 40
+        for (a0, b0, a1, b1) in cut:
+            y0, y1, x0, x1 = int((b0 - oy) * 10), int((b1 - oy) * 10), int((a0 - ox) * 10), int((a1 - ox) * 10)
+            for r in range(y0, y1):
+                l_, r_ = img10[r, x0 - 1], img10[r, x1]
+                img10[r, x0:x1] = l_ + (r_ - l_) * np.linspace(0, 1, x1 - x0)[:, None]
+        img10[redm] = 0
+        img10[~m] = 0
+        lay = vectorize_x10(img10, (ox, oy), (min(x for x, _ in poly) - 1, min(y for _, y in poly) - 1, 370, 600),
+                            list(range(6, 250, 8)), key=lambda a: a.mean(-1), blur=6)
+        L_ = [{'level': l_['level'], 'color': l_['color'],
+               'polys': [[[round(x / W, 6), round(y / H, 6)] for x, y in q] for q in l_['polys']]} for l_ in lay]
+        for lo_ in sys.argv[2:]:
+            path = os.path.join(ROOT, 'layouts', lo_, 'config.json')
+            c2 = json.load(open(path, encoding='utf-8'))
+            c2['elements']['fuel']['fill']['layers'] = L_
+            c2['elements']['fuel']['fill']['_layers'] = ("the lit fill as photographed (full tank), vectorized at 10x: "
+                "luminance layers (labels and the red bar filled in from their sides, blur 0.6 px), painted flat and "
+                "clipped live to the region under the level")
+            json.dump(c2, open(path, 'w', encoding='utf-8'), indent=1)
+        print('fill layers', len(L_), sum(len(l_['polys']) for l_ in L_))
+    if what == 'bar10':                                       # trace_id7.py bar10 id7/Strada id7/Corsa
+        sys.path.insert(0, HERE)
+        import gen_id7 as G
+        cfg = json.load(open(os.path.join(ROOT, 'layouts', sys.argv[2], 'config.json'), encoding='utf-8'))
+        A_, B_, C_ = G.fuel_paths(cfg)
+        p_, d_ = G.level_point(cfg, C_, 1.0)
+        n_ = np.array([-d_[1], d_[0]])
+        img10 = load_x10('M8_fuel_x10').copy()
+        a0, b0, a1, b1 = 257.5, 428.5, 270.5, 449.5             # the '1' over the bar: filled in from its sides
+        y0, y1, x0, x1 = int((b0 - 400) * 10), int((b1 - 400) * 10), int((a0 - 190) * 10), int((a1 - 190) * 10)
+        for r in range(y0, y1):
+            l_, r_ = img10[r, x0 - 1].copy(), img10[r, x1].copy()
+            img10[r, x0:x1] = l_ + (r_ - l_) * np.linspace(0, 1, x1 - x0)[:, None]
+        lay = vectorize_x10(img10, (190, 400), (232, 428, 312, 456), [8, 16, 24] + list(range(32, 256, 12)),
+                            key=lambda a: np.where(a[..., 0] - a[..., 1:].max(-1) > np.minimum(25, a[..., 0] * 0.5), a[..., 0], 0))
+        # local coordinates: u along the level line from its point on C, w across it
+        loc = [{'level': l_['level'], 'color': l_['color'],
+                'polys': [[[round(float(np.dot(np.array(q) - p_, d_)), 2), round(float(np.dot(np.array(q) - p_, n_)), 2)]
+                           for q in poly] for poly in l_['polys']]} for l_ in lay]
+        for lo_ in sys.argv[2:]:
+            path = os.path.join(ROOT, 'layouts', lo_, 'config.json')
+            c2 = json.load(open(path, encoding='utf-8'))
+            c2['elements']['fuel']['bar']['layers'] = loc
+            c2['elements']['fuel']['bar']['_layers'] = ("the level bar as photographed at full, vectorized at 10x, in px "
+                "along (u) and across (w) the level line from its point on C: moved and turned with the level")
+            json.dump(c2, open(path, 'w', encoding='utf-8'), indent=1)
+        print('bar layers', len(loc), sum(len(l_['polys']) for l_ in loc))
+    if what == 'tempfill10':                                  # trace_id7.py tempfill10 id7/Corsa
+        sys.path.insert(0, HERE)
+        import gen_id7 as G
+        from PIL import ImageDraw as IDr
+        path = os.path.join(ROOT, 'layouts', sys.argv[2], 'config.json')
+        cfg = json.load(open(path, encoding='utf-8'))
+        el = cfg['elements']['temp']
+        ax = el['mirror_axis']
+        lo, hi = el['scale']
+        v_ph = (el['photo_value'] - lo) / (hi - lo)
+        A_, B_, C_ = G.fuel_paths(cfg, 'temp')                # the mirrored frame
+        fx = load_x10('M8_fuel_x10')                          # display x 190..370
+        tx = load_x10('M8_temp_x10')                          # display x 1550..1730
+        # the temp photo in the mirrored frame on the fuel's 10x grid: display X <-> 2 ax - X
+        off = int(round((2 * ax - 190 - 1550) * 10))          # fuel column i <-> temp column off - 1 - i
+        ii = np.arange(fx.shape[1]); jj = off - 1 - ii
+        ok_ = (jj >= 0) & (jj < tx.shape[1])
+        tm = np.zeros_like(fx); tm[:, ok_] = tx[:, jj[ok_]]
+        def inpaint(img10, boxes, ox):
+            for (a0, b0, a1, b1) in boxes:
+                y0, y1, x0, x1 = int((b0 - 400) * 10), int((b1 - 400) * 10), int((a0 - ox) * 10), int((a1 - ox) * 10)
+                for r in range(y0, y1):
+                    l_, r_ = img10[r, x0 - 1].copy(), img10[r, x1].copy()
+                    img10[r, x0:x1] = l_ + (r_ - l_) * np.linspace(0, 1, x1 - x0)[:, None]
+        mb = lambda b: (2 * ax - b[2], b[1], 2 * ax - b[0], b[3])
+        t_boxes = [mb(b) for b in [(1611.5, 438, 1659, 458.5), (1596.5, 489.5, 1645, 510), (1565, 533.5, 1601.5, 554)]]
+        inpaint(tm, t_boxes, 190)
+        fz = fx.copy()
+        inpaint(fz, [(257.5, 428.5, 270.5, 449.5), (268.5, 490.5, 312.5, 511.5), (322.5, 535.5, 343.5, 557.5)], 190)
+        # the bar: traced on the temp photo, local to its level point
+        p_, d_ = G.level_point(cfg, C_, v_ph, 'temp')
+        n_ = np.array([-d_[1], d_[0]])
+        redk = lambda a: np.where(a[..., 0] - a[..., 1:].max(-1) > np.minimum(25, a[..., 0] * 0.5), a[..., 0], 0)
+        tb = tm.copy()
+        lay = vectorize_x10(tb, (190, 400), (p_[0] - 4, p_[1] - 16, p_[0] + 70, p_[1] + 10),
+                            [8, 16, 24] + list(range(32, 256, 12)), key=redk)
+        el['bar']['layers'] = [{'level': l_['level'], 'color': l_['color'],
+                                'polys': [[[round(float(np.dot(np.array(q) - p_, d_)), 2), round(float(np.dot(np.array(q) - p_, n_)), 2)]
+                                           for q in poly] for poly in l_['polys']]} for l_ in lay]
+        el['bar']['_layers'] = "the temperature bar as photographed (106 °C), vectorized at 10x on the mirrored photo, local to its level point"
+        # the fill: the temp photo under its level line, the fuel's above it (the photo stops at 106 °C)
+        P0, D0 = np.array(p_), np.array(d_)
+        H10, W10 = fx.shape[:2]
+        Xg, Yg = np.meshgrid(190 + (np.arange(W10) + 0.5) / 10, 400 + (np.arange(H10) + 0.5) / 10)
+        below = (D0[0] * (Yg - P0[1]) - D0[1] * (Xg - P0[0])) > 3.0
+        comb = np.where(below[..., None], tm, fz)
+        comb[(comb[..., 0] - np.maximum(comb[..., 1], comb[..., 2])) > 40] = 0
+        pf, df = G.level_point(cfg, C_, 1.0, 'temp')
+        poly = C_ + [(C_[-1][0] + 30, C_[-1][1] - 4), (pf[0] + df[0] * 120, pf[1] + df[1] * 120)]
+        m = Image.new('L', (W10, H10), 0)
+        IDr.Draw(m).polygon([((x - 190) * 10, (y - 400) * 10) for x, y in poly], fill=255)
+        comb[np.asarray(m) == 0] = 0
+        lay = vectorize_x10(comb, (190, 400), (min(x for x, _ in poly) - 1, min(y for _, y in poly) - 1, 370, 600),
+                            list(range(6, 250, 8)), key=lambda a: a.mean(-1), blur=6)
+        el['fill']['layers'] = [{'level': l_['level'], 'color': l_['color'],
+                                 'polys': [[[round(x / W, 6), round(y / H, 6)] for x, y in q] for q in l_['polys']]} for l_ in lay]
+        el['fill']['_layers'] = ("the lit fill vectorized at 10x in the mirrored frame: the temperature photo under its "
+                                 "106 °C level, the fuel photo above it (no data there)")
+        json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
+        print('temp bar', sum(len(l_['polys']) for l_ in el['bar']['layers']), 'fill', sum(len(l_['polys']) for l_ in el['fill']['layers']))
+    if what == 'labels10':                                    # trace_id7.py labels10 id7/Strada id7/Corsa
+        def white(a):                                         # the glyphs only: pixels joined to a glyph's core
+            v = a.min(-1)
+            keep, ok_ = v >= 225, v >= 110
+            for _ in range(200):
+                g_ = keep.copy()
+                g_[1:] |= keep[:-1]; g_[:-1] |= keep[1:]; g_[:, 1:] |= keep[:, :-1]; g_[:, :-1] |= keep[:, 1:]
+                g_ &= ok_
+                if (g_ == keep).all():
+                    break
+                keep = g_
+            return np.where(keep, v, 0)
+        lv = list(range(110, 256, 12))
+        f10, t10 = load_x10('M8_fuel_x10'), load_x10('M8_temp_x10')
+        def boxes(img10, origin, bxs):
+            out = []
+            for b_ in bxs:
+                for l_ in vectorize_x10(img10, origin, b_, lv, white, blur=1.5):
+                    out.append({'level': l_['level'], 'color': l_['color'],
+                                'polys': [[[round(x / W, 6), round(y / H, 6)] for x, y in p_] for p_ in l_['polys']]})
+            return sorted(out, key=lambda l_: l_['level'])
+        # the photo's white glyphs (display px boxes, 1.5 px margin): 1, 1/2, 0, the pump and its arrow
+        fuel_b = [(257.5, 428.5, 270.5, 449.5), (268.5, 490.5, 312.5, 511.5), (322.5, 535.5, 343.5, 557.5),
+                  (208.5, 535.5, 229.5, 559.5), (230.5, 542.5, 241.5, 554.5)]
+        temp_b = [(1611.5, 438, 1659, 458.5), (1596.5, 489.5, 1645, 510), (1565, 533.5, 1601.5, 554),
+                  (1672, 522.5, 1696.5, 542.5), (1657.5, 540, 1694, 560.5)]
+        FL, TL = boxes(f10, (190, 400), fuel_b), boxes(t10, (1550, 400), temp_b)
+        for lo_ in sys.argv[2:]:
+            path = os.path.join(ROOT, 'layouts', lo_, 'config.json')
+            cfg = json.load(open(path, encoding='utf-8'))
+            cfg['elements']['fuel']['labels']['layers'] = FL
+            cfg['elements']['fuel']['labels']['_layers'] = ("1, 1/2, 0, the pump and its arrow vectorized on the 10x "
+                                                            "enlargement (white = the min channel, levels 110..254)")
+            if 'temp' in cfg['elements']:
+                cfg['elements']['temp']['labels']['layers'] = TL
+                cfg['elements']['temp']['labels']['_layers'] = "150, 100, 50, °C and the oil can, the same way"
+            json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
+            print('labels -> ' + lo_, len(FL), len(TL))
+    if what == 'temp10':                                      # trace_id7.py temp10 id7/Corsa: hot (red) / cold (blue)
+        img10 = load_x10('M8_temp_x10')
+        lv = [8, 16, 24] + list(range(32, 256, 12))
+        red = lambda a: np.where(a[..., 0] - a[..., 1:].max(-1) > np.minimum(25, a[..., 0] * 0.5), a[..., 0], 0)
+        blue = lambda a: np.where(a[..., 2] - a[..., 0] > np.minimum(25, a[..., 2] * 0.5), a[..., 2], 0)
+        parts = {'hot': vectorize_x10(img10, (1550, 400), (1628, 412, 1692, 452), lv, red),
+                 'cold': vectorize_x10(img10, (1550, 400), (1550, 550, 1615, 584), lv, blue)}
+        path = os.path.join(ROOT, 'layouts', sys.argv[2], 'config.json')
+        cfg = json.load(open(path, encoding='utf-8'))
+        t_ = cfg['elements']['temp']
+        t_['overlay'] = {'_about': "the hot (red, top) and cold (blue, bottom) marks vectorized on the 10x enlargement "
+                         "of the temperature gauge itself (M8_temp_x10.png, from x 1550, y 400): colour layers painted "
+                         "flat, lowest first, over the mirrored drawing, in display coordinates (not mirrored)"}
+        for k_, lay in parts.items():
+            t_['overlay'][k_] = [{'level': l_['level'], 'color': l_['color'],
+                                  'polys': [[[round(x / W, 6), round(y / H, 6)] for x, y in p_] for p_ in l_['polys']]} for l_ in lay]
+        json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
+        print('temp overlay -> ' + sys.argv[2], {k_: sum(len(l_['polys']) for l_ in v_) for k_, v_ in parts.items()})
     if what == 'reserve10':                                   # trace_id7.py reserve10 id7/Strada id7/Corsa
         img10 = np.asarray(Image.open(os.path.join(ROOT, 'design', 'refs', 'id7', 'M8_fuel_x10.png')).convert('RGB')).astype(np.float32)
         lay = vectorize_x10(img10, (190, 400), (298, 558, 366, 592), [8, 16, 24] + list(range(32, 250, 12)),

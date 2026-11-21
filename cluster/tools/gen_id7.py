@@ -132,6 +132,7 @@ def draw_fuel_static(img, cfg, trails=True, level=None, key='fuel'):
     # the reserve mark, a horizontal gradient (unless traced in layers: then drawn below, over the lines)
     rp = px(cfg, el['reserve']['poly'])
     layered = bool(el['reserve'].get('layers'))
+    hidden = el['reserve'].get('hidden')                        # temp: its own traced overlay takes its place
     m = Image.new('L', img.size, 0)
     ImageDraw.Draw(m).polygon([(x * SS, y * SS) for x, y in rp], fill=255)
     xs = [p[0] for p in rp]
@@ -141,7 +142,7 @@ def draw_fuel_static(img, cfg, trails=True, level=None, key='fuel'):
     y0, y1 = int(min(p[1] for p in rp) * SS) - 2, int(max(p[1] for p in rp) * SS) + 2
     band = np.repeat(c0 + (c1 - c0) * f, y1 - y0, axis=0)
     fill = Image.fromarray(np.clip(band + 0.5, 0, 255).astype(np.uint8), 'RGB').convert('RGBA')
-    if not layered:
+    if not layered and not hidden:
         img.paste(fill, (0, y0), m.crop((0, y0, img.size[0], y1)))
     lc = tuple(col['line'])
     tr = el['trail']
@@ -164,7 +165,7 @@ def draw_fuel_static(img, cfg, trails=True, level=None, key='fuel'):
         if len(seg) > 1:
             _line(d, seg, el['B_width'], tuple(bz['color']))
     tp = el.get('top')
-    if tp:                                                      # the '1': the wedge towards the label and the barb
+    if tp and not tp.get('hidden'):                             # the '1': the wedge towards the label and the barb
         _strip(d, px(cfg, tp['wedge']), tp['w0'], tp['w1'], tuple(tp['c0']), tuple(tp['c1']))
         _line(d, px(cfg, tp['barb']), tp['barb_width'], tuple(tp.get('barb_color', lc)))
     sh = el['reserve'].get('shade')
@@ -172,7 +173,7 @@ def draw_fuel_static(img, cfg, trails=True, level=None, key='fuel'):
         for lay in el['reserve']['layers']:
             for poly in lay['polys']:
                 d.polygon([(x * SS, y * SS) for x, y in px(cfg, poly)], fill=tuple(lay['color']))
-    elif sh:
+    elif sh and not hidden:
         d.polygon([(x * SS, y * SS) for x, y in px(cfg, sh['pts'])], fill=tuple(sh['color']))
     for t in el.get('triangles', []):                           # on B's inner side, apex towards C
         p, dvec = level_point(cfg, C, t['at'], key)
@@ -219,6 +220,9 @@ def _below(cfg, p, dvec, X, Y):
 
 def draw_fuel_labels(img, cfg, key='fuel'):
     el = cfg['elements'][key]
+    if el['labels'].get('layers'):                              # traced at 10x: the photo's own glyphs
+        draw_layers(img, cfg, el['labels']['layers'])
+        return
     W, H = cfg['grid']
     lb = el['labels']
     for it in lb['items']:
@@ -279,10 +283,18 @@ def draw_fuel_level(img, cfg, v, key='fuel'):
     img.alpha_composite(Image.fromarray(np.clip(lay + 0.5, 0, 255).astype(np.uint8), 'RGBA'))
     arr = np.asarray(img).astype(np.float32)
     sub = arr[y0:y1, x0:x1, :3]
-    arr[y0:y1, x0:x1, :3] = sub + (np.array(col['fill'], np.float32) - sub) * k[..., None]
+    tex = el['fill'].get('layers')
+    if tex:                                                     # the photographed fill (10x trace), cut at the level
+        T = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        draw_layers(T, cfg, tex)
+        T = np.asarray(T).astype(np.float32)[y0:y1, x0:x1]
+        a = T[..., 3:] / 255 * (m * _below(cfg, p, dvec, X, Y))[..., None]
+        arr[y0:y1, x0:x1, :3] = sub * (1 - a) + T[..., :3] * a
+    else:
+        arr[y0:y1, x0:x1, :3] = sub + (np.array(col['fill'], np.float32) - sub) * k[..., None]
     img = Image.fromarray(np.clip(arr + 0.5, 0, 255).astype(np.uint8), 'RGBA')
     tr = el.get('trail')
-    if tr:                                                      # the trails go on faintly over the lit fill
+    if tr and not tex:                                                      # the trails go on faintly over the lit fill
         lm = Image.new('L', (W * SS, H * SS), 0)
         ld = ImageDraw.Draw(lm)
         for t in el.get('triangles', []):
@@ -295,6 +307,17 @@ def draw_fuel_level(img, cfg, v, key='fuel'):
         arr[..., :3] += (255 - arr[..., :3]) * (la * tr['fill_gain'])[..., None] * (arr[..., :3].mean(-1, keepdims=True) > 30)
         img = Image.fromarray(np.clip(arr + 0.5, 0, 255).astype(np.uint8), 'RGBA')
     # the bar: along the level line from the rail (B's inner edge), thick, its far end softening out (close-up photo)
+    if el['bar'].get('layers'):                                 # the photographed bar (10x trace), at this level
+        n = np.array([-dvec[1], dvec[0]])
+        big = Image.new('RGBA', (img.size[0] * SS, img.size[1] * SS), (0, 0, 0, 0))
+        bd = ImageDraw.Draw(big)
+        P0 = np.array(p, float)
+        for lay in el['bar']['layers']:
+            for poly in lay['polys']:
+                q = [P0 + dvec * u + n * w_ for u, w_ in poly]
+                bd.polygon([(x * SS, y * SS) for x, y in q], fill=tuple(lay['color']) + (255,))
+        img.alpha_composite(big.resize(img.size, Image.LANCZOS))
+        return img
     bl, bt = el['bar']['len'], el['bar']['thick']
     n = np.array([-dvec[1], dvec[0]])
     if el['bar'].get('from') == 'C':                            # from the lit edge (M8 reference)
@@ -339,12 +362,34 @@ def draw_temp_static(img, cfg):
     draw_fuel_static(big, cfg, key='temp')
     big = mirror(big, el['mirror_axis'])
     img.alpha_composite(big.resize((W, H), Image.LANCZOS))
+    draw_temp_overlay(img, cfg)
+
+
+def draw_layers(img, cfg, layers):
+    """Traced colour layers (display coordinates): flat polygons, lowest first, supersampled."""
+    W, H = cfg['grid']
+    big = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big)
+    for lay in layers:
+        for poly in lay['polys']:
+            d.polygon([(x * W * SS, y * H * SS) for x, y in poly], fill=tuple(lay['color']) + (255,))
+    img.alpha_composite(big.resize((W, H), Image.LANCZOS))
+
+
+def draw_temp_overlay(img, cfg):
+    ov = cfg['elements']['temp'].get('overlay', {})
+    for k in ('cold', 'hot'):
+        if k in ov:
+            draw_layers(img, cfg, ov[k])
 
 
 def draw_temp_labels(img, cfg):
     """50 / 100 / 150 and the icon (°C and the oil can), on the display as measured (not mirrored)."""
     W, H = cfg['grid']
     lb = cfg['elements']['temp']['labels']
+    if lb.get('layers'):                                        # traced at 10x: the photo's own glyphs
+        draw_layers(img, cfg, lb['layers'])
+        return
     for it in lb['items']:
         x0, y0, x1, y1 = it['box'][0] * W, it['box'][1] * H, it['box'][2] * W, it['box'][3] * H
         tmp = Image.new('RGBA', (900, 300), (0, 0, 0, 0))
@@ -394,6 +439,7 @@ def draw_temp_level(img, cfg, t_c):
     draw_fuel_static(rail, cfg, trails=False, level=v, key='temp')
     m.alpha_composite(rail.resize((W, H), Image.LANCZOS))
     img = mirror(m, el['mirror_axis'], back=True)
+    draw_temp_overlay(img, cfg)
     draw_temp_labels(img, cfg)
     return img
 
