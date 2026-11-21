@@ -744,7 +744,10 @@ def ridge(key10, origin, pts, hw, min_peak=90, step=1.0, iters=3):
         prof = _bilinear(key10, X, Y)
         C, Wd, Pk, ok = [], [], [], []
         for i, pr in enumerate(prof):
-            k = int(np.argmax(pr)); pk = pr[k]
+            # the local maximum nearest the track (a brighter neighbouring line must not pull it over)
+            pkx = [j for j in range(1, len(pr) - 1) if pr[j] >= pr[j - 1] and pr[j] >= pr[j + 1] and pr[j] >= 0.5 * pr.max()]
+            k = min(pkx, key=lambda j: abs(ss[j])) if pkx else int(np.argmax(pr))
+            pk = pr[k]
             if pk < min_peak:
                 C.append(0.0); Wd.append(0.0); Pk.append(pk); ok.append(False); continue
             half = pk / 2
@@ -794,9 +797,10 @@ def gauge10(img10, origin, seeds, label_boxes, bar_box):
     Lm = img10.mean(2)
     H10, W10 = key.shape
     out, lines = {}, {}
-    for name, hw in (('A', 1.6), ('B', 2.2), ('C', 2.0)):
-        P, Wd, Pk, ok = ridge(key, origin, _ext(seeds[name]), hw)
-        g_ = np.flatnonzero(Pk >= 110)
+    for name, hw in (('A', 2.6), ('B', 2.6), ('C', 2.4)):
+        P, Wd, Pk, ok = ridge(key, origin, _ext(seeds[name], 14.0), hw, min_peak=50)
+        mid = Pk[len(Pk) // 4:3 * len(Pk) // 4]
+        g_ = np.flatnonzero(Pk >= 0.45 * float(np.median(mid)))    # where the line ends (its own brightness)
         P, Wd = P[g_[0]:g_[-1] + 1], Wd[g_[0]:g_[-1] + 1]
         w_ = float(np.median(Wd[Wd > 0]))
         rgb = np.median(img10[np.clip(((P[:, 1] - oy) * 10).astype(int), 0, H10 - 1),
@@ -908,10 +912,14 @@ def gauge10_build(img10, origin, seeds, level_pick, label_boxes, bar_box, top_bo
     for nm in ('A', 'B'):
         P_, w_ = lines[nm]
         IDr.Draw(near).line([T(x, y) for x, y in P_], fill=255, width=int((w_ + 14) * 10), joint='curve')
-    keep = ((~lm & ~m & (np.asarray(near) > 0)) | (tb & ~la)) & ~red
+    nb_ = Image.new('L', (W10, H10), 0)                        # the marks on B's inner side (ticks) are static
+    IDr.Draw(nb_).line([T(x, y) for x, y in lines['B'][0]], fill=255, width=int((lines['B'][1] + 12) * 10), joint='curve')
+    nb_ = np.asarray(nb_) > 0
+    keep = ((~lm & (np.asarray(near) > 0) & (~m | nb_)) | (tb & ~la)) & ~red
     ex[~keep] = 0
     def white(a):
-        v = a.min(-1); core, ok_ = v >= 200, v >= 90
+        v = np.where(a.max(-1) - a.min(-1) < 70, a.min(-1), 0)   # white / grey only (not the blue or red marks' edges)
+        core, ok_ = v >= 200, v >= 90
         for _ in range(300):
             g_ = core.copy()
             g_[1:] |= core[:-1]; g_[:-1] |= core[1:]; g_[:, 1:] |= core[:, :-1]; g_[:, :-1] |= core[:, 1:]
@@ -921,16 +929,45 @@ def gauge10_build(img10, origin, seeds, level_pick, label_boxes, bar_box, top_bo
             core = g_
         return np.where(core, v, 0)
     allx = [q[0] for nm in ('A', 'B') for q in lines[nm][0]]; ally = [q[1] for nm in ('A', 'B') for q in lines[nm][0]]
+    exm = white(ex) > 0                                         # ... and out of the live texture
+    if exm.any():
+        fill = vectorize_x10(np.where(exm[..., None], 0, tex), origin, (min(xs_) - 1, min(ys_) - 1, max(xs_) + 1, max(ys_) + 1),
+                             list(range(6, 250, 8)), key=lambda a: a.mean(-1), blur=4)
     extras = vectorize_x10(ex, origin, (min(allx) - 6, min(ally) - 6, max(allx) + 14, max(ally) + 6),
                            list(range(90, 256, 14)), key=white, blur=1.5)
     # the bar, local to the 'full' point
     nb = np.array([-d1[1], d1[0]])
     bimg = (img10 if bar_img is None else bar_img).copy()
-    for (a0, b0, a1, b1) in label_boxes:                       # a label over the bar: filled in from its sides
-        y0, y1, x0, x1 = int((b0 - oy) * 10), int((b1 - oy) * 10), int((a0 - ox) * 10), int((a1 - ox) * 10)
-        for r in range(y0, y1):
-            l_, r_ = bimg[r, x0 - 1].copy(), bimg[r, x1].copy()
-            bimg[r, x0:x1] = l_ + (r_ - l_) * np.linspace(0, 1, x1 - x0)[:, None]
+    bx0, by0, bx1, by1 = [int(round(v)) for v in (((bar_box[0] - ox) * 10), ((bar_box[1] - oy) * 10), ((bar_box[2] - ox) * 10), ((bar_box[3] - oy) * 10))]
+    rm = (bimg[..., 0] - np.maximum(bimg[..., 1], bimg[..., 2])) > 80
+    for (a0, b0, a1, b1) in label_boxes:                       # a label over the bar: the bar goes on under it as the
+        y0, y1, x0, x1 = int((b0 - oy) * 10), int((b1 - oy) * 10), int((a0 - ox) * 10), int((a1 - ox) * 10)   # same slanted band
+        if x1 < bx0 or x0 > bx1 or y1 < by0 or y0 > by1:
+            continue
+        cols = [c for c in range(max(bx0, x0), min(bx1, x1 + 400)) if not (x0 <= c < x1) or True]
+        best = None
+        for rng in (range(x1 + 5, min(bx1, x1 + 220)), range(max(bx0, x0 - 220), x0 - 5)):   # the side where the bar shows
+            tops, bots, cs = [], [], []
+            for c in rng:
+                r_ = np.flatnonzero(rm[by0:by1, c])
+                if len(r_) > 20:
+                    tops.append(by0 + r_[0]); bots.append(by0 + r_[-1]); cs.append(c)
+            if best is None or len(cs) > len(best[2]):
+                best = (tops, bots, cs)
+        tops, bots, cs = best
+        if len(cs) < 20:
+            continue
+        kt, kb = np.polyfit(cs, tops, 1), np.polyfit(cs, bots, 1)
+        ne = np.argsort(np.abs(np.array(cs) - (x0 + x1) / 2))[:10]      # its colour next to the label
+        col = np.median(np.concatenate([bimg[int(tops[j] + 15):int(bots[j] - 15), cs[j]] for j in ne]), 0)
+        for c in range(max(0, x0 - 2), x1 + 3):
+            t_, b_ = np.polyval(kt, c), np.polyval(kb, c)
+            col_ = bimg[:, c].copy()
+            col_[y0:y1] = (10, 10, 12)
+            rr = np.arange(len(col_))
+            band = (rr >= t_) & (rr <= b_) & (rr >= y0 - 20) & (rr < y1 + 20)
+            col_[band] = col
+            bimg[:, c] = col_
     bar = vectorize_x10(bimg, origin, bar_box, [8, 16, 24] + list(range(32, 256, 12)),
                         key=lambda a: np.where(a[..., 0] - a[..., 1:].max(-1) > np.minimum(25, a[..., 0] * 0.5), a[..., 0], 0))
     NZ = lambda pp: [[round(x / W, 6), round(y / H, 6)] for x, y in pp]
@@ -1068,7 +1105,9 @@ def main():
         m = Image.new('L', (W10, H10), 0)
         IDr.Draw(m).polygon([((x - 190) * 10, (y - 400) * 10) for x, y in list(map(tuple, Bi)) + [(352, 566), (372, 548), (372, 410), (Bi[0][0], 410)]], fill=255)
         reg = np.asarray(m) > 0
-        comp = np.where((reg & above)[..., None], warped, tm).astype(np.float32)
+        nbm = Image.new('L', (W10, H10), 0)
+        IDr.Draw(nbm).line([((x - 190) * 10, (y - 400) * 10) for x, y in PB], fill=255, width=int((wB + 11) * 10), joint='curve')
+        comp = np.where((reg & above & ~(np.asarray(nbm) > 0))[..., None], warped, tm).astype(np.float32)
         # the C seed for the upper part: the fuel's C through the map
         Cf = np.array(f['C']) * [W, H]
         seeds_t['C'] = np.c_[sol[0] * Cf[:, 0] + sol[1] * Cf[:, 1] + sol[2], Cf[:, 1]]
@@ -1093,6 +1132,23 @@ def main():
         for l_ in g['bar_layers']:
             l_['polys'] = [[[round(float(np.dot(p1 + d1 * u + n1 * w_ - pv, dv)), 2), round(float(np.dot(p1 + d1 * u + n1 * w_ - pv, nv)), 2)]
                             for u, w_ in poly] for poly in l_['polys']]
+        # its far end: on the photo the bar shows in the second 0's counter, not in the first's -> it ends between
+        # them (display x 1626, the second 0's outer left edge, 1628, less its 2 px outline)
+        umax = float((2 * ax - 1626.0 - pv[0]) / dv[0])
+        def clip_u(poly, um):                                   # Sutherland-Hodgman against u <= um
+            out_ = []
+            for i_ in range(len(poly)):
+                a_, b_ = poly[i_ - 1], poly[i_]
+                ina, inb = a_[0] <= um, b_[0] <= um
+                if inb:
+                    if not ina:
+                        t_ = (um - a_[0]) / (b_[0] - a_[0]); out_.append([um, round(a_[1] + t_ * (b_[1] - a_[1]), 2)])
+                    out_.append(b_)
+                elif ina:
+                    t_ = (um - a_[0]) / (b_[0] - a_[0]); out_.append([um, round(a_[1] + t_ * (b_[1] - a_[1]), 2)])
+            return out_
+        for l_ in g['bar_layers']:
+            l_['polys'] = [q for q in (clip_u(poly, umax) for poly in l_['polys']) if len(q) >= 3]
         about = ("The temperature gauge, rebuilt on BMW M GmbH's photo only, in the frame mirrored about x %.1f (drawn by the "
                  "fuel gauge's code, then mirrored): A, B, the extras, the bar and the fill under 106 °C from its own photo at "
                  "10x; above 106 °C (not shown on the photo) C, the fill and the scale come from the fuel gauge's photo warped "
