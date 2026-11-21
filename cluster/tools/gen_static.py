@@ -601,6 +601,28 @@ def draw_gauge_labels(img, cfg):
             draw(img, ic['at'][0] * W, ic['at'][1] * H, ic['size'][0], ic['size'][1], lb['color'])
 
 
+def draw_tray(img, cfg):
+    """The stylised blue trapezoid at the bottom centre (config 'tray'): its segments filled with one vertical gradient
+    (stops over the whole height), drawn on the supersampled canvas so the slanted cuts stay clean."""
+    el = cfg['elements'].get('tray')
+    if not el:
+        return
+    W, H = cfg['grid']
+    segs = [[(x * W * SS, y * H * SS) for x, y in s] for s in el['segments']]
+    y0 = int(min(p[1] for s in segs for p in s)); y1 = int(math.ceil(max(p[1] for s in segs for p in s)))
+    x0 = int(min(p[0] for s in segs for p in s)); x1 = int(math.ceil(max(p[0] for s in segs for p in s)))
+    m = Image.new('L', (x1 - x0, y1 - y0), 0)
+    md = ImageDraw.Draw(m)
+    for s in segs:
+        md.polygon([(x - x0, y - y0) for x, y in s], fill=255)
+    f = (np.arange(y1 - y0) + 0.5) / (y1 - y0)
+    st = el['stops']
+    grad = np.stack([np.interp(f, [s[0] for s in st], [s[1][c] for s in st]) for c in range(3)], -1)
+    arr = np.repeat(grad[:, None, :], x1 - x0, axis=1)
+    fill = Image.fromarray(np.clip(arr + 0.5, 0, 255).astype(np.uint8), 'RGB').convert('RGBA')
+    img.paste(fill, (x0, y0), m)
+
+
 def feet_glow(img, cfg):
     """The blurred blue / red glow under the brackets' feet (config 'feet_glow'), added over the black."""
     W, H = cfg['grid']
@@ -688,6 +710,7 @@ def build_static(cfg):
             d.rectangle([x0 * SS, y0 * SS, x1 * SS, y1 * SS], fill=tuple(col['tick']))
     draw_panel(img, cfg)
     draw_bar(img, cfg)
+    draw_tray(img, cfg)
     d = ImageDraw.Draw(img)
     draw_gauges(d, cfg, sc)
     img = img.resize((W, H), Image.LANCZOS)
