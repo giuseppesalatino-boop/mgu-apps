@@ -343,6 +343,65 @@ def draw_fuel_level(img, cfg, v, key='fuel'):
     return img
 
 
+# ---------------------------------------------------------------- a fuel-type gauge rebuilt at 10x (trace_id7 fuel10)
+
+def rebuilt(cfg, key):
+    return 'extras' in cfg['elements'].get(key, {})
+
+
+def g10_level_point(cfg, key, v):
+    """The level line at v (0..1): its point on C (by arc position) and its direction."""
+    el = cfg['elements'][key]
+    C = np.array(densify(px(cfg, el['C']), step=0.25))
+    arc = np.r_[0, np.cumsum(np.linalg.norm(np.diff(C, axis=0), axis=1))]
+    lv = el['levels']                                           # each scale line's point on C -> its arc on C
+    ar = [float(arc[int(np.argmin(np.linalg.norm(C - np.array(q[1:]), axis=1)))]) for q in lv['pts']]
+    a = np.interp(v, [q[0] for q in lv['pts']], ar)
+    p = C[int(np.argmin(np.abs(arc - a)))]
+    k = np.interp(v, [q[0] for q in lv['slope']], [q[1] for q in lv['slope']])
+    d = np.array([1.0, k])
+    return p, d / np.linalg.norm(d)
+
+
+def g10_static(img, cfg, key):
+    """A and B (measured widths and colours), the static white marks, the reserve (supersampled, then onto img)."""
+    W, H = cfg['grid']
+    el = cfg['elements'][key]
+    big = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big)
+    _line(d, densify(px(cfg, el['A']), 0.5), el['A_width'], tuple(el['colors']['A']) + (255,))
+    _line(d, densify(px(cfg, el['B']), 0.5), el['B_width'], tuple(el['colors']['line']) + (255,))
+    img.alpha_composite(big.resize((W, H), Image.LANCZOS))
+    draw_layers(img, cfg, el['extras'])
+    if el['reserve'].get('layers') and not el['reserve'].get('hidden'):
+        draw_layers(img, cfg, el['reserve']['layers'])
+
+
+def g10_level(img, cfg, key, v):
+    """The live part at v: track, C and fill as photographed, cut at the level line; the bar at the level."""
+    W, H = cfg['grid']
+    el = cfg['elements'][key]
+    v = float(np.clip(v, 0, 1))
+    p, dvec = g10_level_point(cfg, key, v)
+    T = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    draw_layers(T, cfg, el['fill']['layers'])
+    T = np.asarray(T).astype(np.float32)
+    XX, YY = np.meshgrid(np.arange(W) + 0.5, np.arange(H) + 0.5)
+    a = T[..., 3:] / 255 * _below(cfg, p, dvec, XX, YY)[..., None]
+    arr = np.asarray(img).astype(np.float32)
+    arr[..., :3] = arr[..., :3] * (1 - a) + T[..., :3] * a
+    img = Image.fromarray(np.clip(arr + 0.5, 0, 255).astype(np.uint8), 'RGBA')
+    n = np.array([-dvec[1], dvec[0]])
+    big = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(big)
+    for lay in el['bar']['layers']:
+        for poly in lay['polys']:
+            q = [p + dvec * u + n * w_ for u, w_ in poly]
+            bd.polygon([(x * SS, y * SS) for x, y in q], fill=tuple(lay['color']) + (255,))
+    img.alpha_composite(big.resize((W, H), Image.LANCZOS))
+    return img
+
+
 # ---------------------------------------------------------------- the temperature gauge (Corsa): the fuel gauge's mirror
 
 def mirror(img, axis, back=False):
@@ -358,6 +417,12 @@ def draw_temp_static(img, cfg):
     """The fuel gauge's drawing in the mirrored frame (temp's lines stored there), mirrored onto the right."""
     W, H = cfg['grid']
     el = cfg['elements']['temp']
+    if rebuilt(cfg, 'temp'):                                    # 10x rebuild: drawn on a clear layer, mirrored
+        lay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        g10_static(lay, cfg, 'temp')
+        img.alpha_composite(mirror(lay, el['mirror_axis']))
+        draw_temp_overlay(img, cfg)
+        return
     big = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
     draw_fuel_static(big, cfg, key='temp')
     big = mirror(big, el['mirror_axis'])
@@ -434,6 +499,12 @@ def draw_temp_level(img, cfg, t_c):
     lo, hi = el['scale']
     v = float(np.clip((t_c - lo) / (hi - lo), 0, 1))
     m = mirror(img, el['mirror_axis'])
+    if rebuilt(cfg, 'temp'):
+        m = g10_level(m, cfg, 'temp', v)
+        img = mirror(m, el['mirror_axis'], back=True)
+        draw_temp_overlay(img, cfg)
+        draw_temp_labels(img, cfg)
+        return img
     m = draw_fuel_level(m, cfg, v, key='temp')
     rail = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
     draw_fuel_static(rail, cfg, trails=False, level=v, key='temp')
@@ -755,9 +826,11 @@ def build_static(cfg):
     W, H = cfg['grid']
     el = cfg['elements']
     big = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 255))
-    if 'fuel' in el:
+    if 'fuel' in el and not rebuilt(cfg, 'fuel'):
         draw_fuel_static(big, cfg)
     img = big.resize((W, H), Image.LANCZOS)
+    if rebuilt(cfg, 'fuel'):
+        g10_static(img, cfg, 'fuel')
     for b in blades(cfg):
         img = draw_blade_body(img, cfg, b)
     if 'revs' in el:
@@ -796,7 +869,10 @@ def draw_dynamic(img, cfg, tel):
         for b in blades(cfg):
             draw_blade_lines(top, cfg, b)
         img.alpha_composite(top.resize((W, H), Image.LANCZOS))
-    if 'fuel' in tel:
+    if 'fuel' in tel and rebuilt(cfg, 'fuel'):
+        img = g10_level(img, cfg, 'fuel', tel['fuel'])
+        draw_fuel_labels(img, cfg)
+    elif 'fuel' in tel:
         img = draw_fuel_level(img, cfg, tel['fuel'])
         W, H = cfg['grid']                                      # the rail (lines, triangles, trails) stays over the fill
         rail = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))

@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """trace_id7.py - automatic contour tracing on the 4x enlargement of the BMW M reference (ID7 Corsa / M View).
 
-    python3 cluster/tools/trace_id7.py blade            # prints the traced blades (left, right mirrored) as JSON
+    python3 cluster/tools/trace_id7.py revs id7/Corsa     # the rev counter blades (4x)
+    python3 cluster/tools/trace_id7.py center id7/Corsa   # gear, speed, km/h, the line (4x)
+    python3 cluster/tools/trace_id7.py fuel10 id7/Strada id7/Corsa   # the fuel gauge rebuilt at 10x
+    python3 cluster/tools/trace_id7.py temp10 id7/Corsa   # the temperature gauge at 10x (run tempmirror10 952.5 first)
+    python3 cluster/tools/trace_id7.py tempzones10 / reserve10 / labels10 ...   # hot-cold marks, reserve, labels
 
 Reads cluster/design/refs/id7/M8_mview_x4.png (photo * 0.3104 * 4, not in git). Every coordinate is measured on the
 4x grid with sub-pixel half-maximum crossings / weighted centroids, returned in display px and normalized on 1920x720.
@@ -699,6 +703,266 @@ def vectorize_x10(img10, origin, box, layers, key, blur=3):
     return out
 
 
+def _bilinear(img, xs, ys):
+    """img (H x W) sampled at float pixel coordinates."""
+    h, w = img.shape
+    x0 = np.clip(np.floor(xs).astype(int), 0, w - 2); y0 = np.clip(np.floor(ys).astype(int), 0, h - 2)
+    fx, fy = np.clip(xs - x0, 0, 1), np.clip(ys - y0, 0, 1)
+    return (img[y0, x0] * (1 - fx) * (1 - fy) + img[y0, x0 + 1] * fx * (1 - fy)
+            + img[y0 + 1, x0] * (1 - fx) * fy + img[y0 + 1, x0 + 1] * fx * fy)
+
+
+def _catmull(pts, step):
+    P = [pts[0]] + list(pts) + [pts[-1]]
+    out = []
+    for i in range(1, len(P) - 2):
+        p0, p1, p2, p3 = (np.array(P[i + k], float) for k in (-1, 0, 1, 2))
+        n = max(2, int(np.linalg.norm(p2 - p1) / step))
+        for t in np.linspace(0, 1, n, endpoint=False):
+            t2, t3 = t * t, t * t * t
+            out.append(0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
+    out.append(np.array(pts[-1], float))
+    return np.array(out)
+
+
+def densify_np(pts, step):
+    return _catmull([tuple(q) for q in pts], step)
+
+
+def ridge(key10, origin, pts, hw, min_peak=90, step=1.0, iters=3):
+    """A bright line followed on the 10x image: at every point (display px) the profile across the line (+-hw px,
+    0.1 px steps); its centre = the centroid of the part above half the local peak, its width = that part's length.
+    Points without a clear peak (gaps, ticks) are bridged. Returns (centre points, widths, peaks), display px."""
+    ox, oy = origin
+    P = _catmull(pts, step)
+    for _ in range(iters):
+        tg = np.gradient(P, axis=0); tg /= np.linalg.norm(tg, axis=1, keepdims=True) + 1e-9
+        nr = np.stack([-tg[:, 1], tg[:, 0]], 1)
+        ss = np.arange(-hw, hw + 1e-6, 0.1)
+        X = (P[:, None, 0] + nr[:, None, 0] * ss[None] - ox) * 10 - 0.5
+        Y = (P[:, None, 1] + nr[:, None, 1] * ss[None] - oy) * 10 - 0.5
+        prof = _bilinear(key10, X, Y)
+        C, Wd, Pk, ok = [], [], [], []
+        for i, pr in enumerate(prof):
+            k = int(np.argmax(pr)); pk = pr[k]
+            if pk < min_peak:
+                C.append(0.0); Wd.append(0.0); Pk.append(pk); ok.append(False); continue
+            half = pk / 2
+            lo = k
+            while lo > 0 and pr[lo - 1] >= half:
+                lo -= 1
+            hi = k
+            while hi < len(pr) - 1 and pr[hi + 1] >= half:
+                hi += 1
+            seg = pr[lo:hi + 1] - half
+            C.append(float((ss[lo:hi + 1] * seg).sum() / seg.sum())); Wd.append((hi - lo + 1) * 0.1); Pk.append(pk); ok.append(True)
+        ok = np.array(ok); C = np.array(C); Wd = np.array(Wd)
+        idx = np.arange(len(P))
+        if ok.sum() < 2:
+            break
+        C = np.interp(idx, idx[ok], C[ok]); Wd = np.interp(idx, idx[ok], Wd[ok])
+        k_ = np.ones(5) / 5
+        C = np.convolve(np.pad(C, 2, mode='edge'), k_, 'valid')
+        P = P + nr * C[:, None]
+    return P, Wd, np.array(Pk), ok
+
+
+# coarse starting tracks (whole px) for the fuel gauge's A, B, C: they only start the ridge search, so a rebuild
+# never depends on the previous one; the temperature gauge starts from their mirror image (its own frame)
+SEEDS_FUEL = {"A": [[235, 419], [224, 436], [216, 452], [215, 468], [219, 484], [225, 500], [232, 516], [241, 532], [251, 548], [263, 563], [278, 577], [294, 584], [314, 586], [332, 586]], "B": [[232, 432], [223, 448], [220, 464], [223, 480], [229, 496], [236, 512], [245, 528], [255, 544], [266, 559], [282, 573], [298, 579], [303, 580]], "C": [[239, 446], [234, 464], [238, 480], [244, 496], [252, 512], [261, 528], [274, 545], [294, 563], [310, 566], [342, 563], [350, 560]]}
+
+
+def _ext(pts, L=8.0):
+    pts = np.array(pts, float)
+    a0 = pts[0] + (pts[0] - pts[1]) / np.linalg.norm(pts[0] - pts[1]) * L
+    a1 = pts[-1] + (pts[-1] - pts[-2]) / np.linalg.norm(pts[-1] - pts[-2]) * L
+    return np.vstack([a0, pts, a1])
+
+
+def gauge10(img10, origin, seeds, label_boxes, bar_box):
+    """The fuel-type gauge rebuilt from a 10x image only (display px, the fuel's orientation: fill to the right of C).
+    seeds: rough A / B / C polylines that only start the ridge search; every returned value is measured.
+      - A, B, C: ridge centres (trimmed where the line ends), widths and colours;
+      - levels: arc position on C and slope of each scale line (dark lines in the lit fill, the bar for 'full');
+      - extras: the white marks not explained by A / B (the ticks, the top corner), as colour layers (static);
+      - fill: everything between B's inner edge and the fill's far side (track, C, fill, the 1/2 tick), labels
+        and red filled in from their sides, as layers cut live at the level;
+      - bar: the red level bar, layers local to its level point."""
+    from PIL import ImageDraw as IDr
+    ox, oy = origin
+    key = img10.min(2)
+    Lm = img10.mean(2)
+    H10, W10 = key.shape
+    out, lines = {}, {}
+    for name, hw in (('A', 1.6), ('B', 2.2), ('C', 2.0)):
+        P, Wd, Pk, ok = ridge(key, origin, _ext(seeds[name]), hw)
+        g_ = np.flatnonzero(Pk >= 110)
+        P, Wd = P[g_[0]:g_[-1] + 1], Wd[g_[0]:g_[-1] + 1]
+        w_ = float(np.median(Wd[Wd > 0]))
+        rgb = np.median(img10[np.clip(((P[:, 1] - oy) * 10).astype(int), 0, H10 - 1),
+                              np.clip(((P[:, 0] - ox) * 10).astype(int), 0, W10 - 1)], 0)
+        lines[name] = (P, w_)
+        out[name] = [[round(float(x), 2), round(float(y), 2)] for x, y in simplify([tuple(q) for q in P], 0.08)]
+        out[name + '_width'] = round(w_, 2)
+        out[name + '_color'] = rgb.round().astype(int).tolist()
+    # the scale lines: darker lines leaving C into the lit fill (contrast to their parallels, 4..26 px from C)
+    PC = lines['C'][0]
+    arc = np.r_[0, np.cumsum(np.linalg.norm(np.diff(PC, axis=0), axis=1))]
+    cand = []
+    for i in range(len(PC)):
+        for k in np.arange(-0.45, 0.01, 0.025):
+            d = np.array([1, k]); d /= np.linalg.norm(d); nrm = np.array([-d[1], d[0]])
+            q = PC[i] + d * np.arange(4, 26, 0.5)[:, None]
+            v = lambda qq: _bilinear(Lm, (qq[:, 0] - ox) * 10 - .5, (qq[:, 1] - oy) * 10 - .5).mean()
+            c = min(v(q - nrm * 2.5), v(q + nrm * 2.5)) - v(q)
+            cand.append((c, i, k))
+    cand.sort(reverse=True)
+    picked = []
+    for c, i, k in cand:
+        if c < 8:
+            break
+        if all(abs(i - j) > 8 for _, j, _ in picked):
+            picked.append((c, i, k))
+    out['_scale_lines'] = [[round(float(arc[i]), 2), round(float(k), 3), round(float(c), 1)] for c, i, k in sorted(picked, key=lambda x: x[1])]
+    # the bar: its slope (red pixels left of the label) and its point on C
+    R_, G_, B_c = img10[..., 0], img10[..., 1], img10[..., 2]
+    x0b, y0b, x1b, y1b = bar_box
+    sub = (R_ > 200) & (G_ < 120)
+    ys, xs = np.nonzero(sub[int((y0b - oy) * 10):int((y1b - oy) * 10), int((x0b - ox) * 10):int((x1b - ox) * 10)])
+    k_bar = float(np.polyfit(x0b + xs / 10, y0b + ys / 10, 1)[0])
+    out['_bar_slope'] = round(k_bar, 3)
+    out['_arc'] = [round(float(v), 2) for v in arc[[0, -1]]]
+    return out, lines
+
+
+def gauge10_build(img10, origin, seeds, level_pick, label_boxes, bar_box, top_box, region_far, far_len=85, bar_img=None,
+                  anchor=None):
+    """The whole fuel-type gauge from the 10x image (see gauge10): returns the config fields, display px."""
+    from PIL import ImageDraw as IDr
+    ox, oy = origin
+    g, lines = gauge10(img10, origin, seeds, label_boxes, bar_box)
+    key = img10.min(2)
+    H10, W10 = key.shape
+    T = lambda x, y: ((x - ox) * 10, (y - oy) * 10)
+    PC = lines['C'][0]
+    arc = np.r_[0, np.cumsum(np.linalg.norm(np.diff(PC, axis=0), axis=1))]
+    # levels: each scale line's point on C (absolute, so the scale does not depend on where C's trace starts) and
+    # slope; picks come as points, or as arc lengths from an anchor point on C
+    a0 = float(arc[int(np.argmin(np.linalg.norm(PC - np.array(anchor), axis=1)))]) if anchor is not None else 0.0
+    pts_ = []
+    for v, q, k in level_pick:
+        if np.ndim(q) == 0:
+            q = PC[int(np.argmin(np.abs(arc - (a0 + q))))]
+        pts_.append([v, round(float(q[0]), 2), round(float(q[1]), 2)])
+    lv = {'pts': pts_, 'slope': [[v, k] for v, _, k in level_pick]}
+    def lp(v):
+        ar = [float(arc[int(np.argmin(np.linalg.norm(PC - np.array(q[1:]), axis=1)))]) for q in lv['pts']]
+        a_ = np.interp(v, [q[0] for q in lv['pts']], ar)
+        i = int(np.argmin(np.abs(arc - a_)))
+        k = np.interp(v, [q[0] for q in lv['slope']], [q[1] for q in lv['slope']])
+        d = np.array([1.0, k]); return PC[i], d / np.linalg.norm(d)
+    # the region that follows the level: between B's inner edge and the fill's far side, up to the 'full' line
+    PB, wB = lines['B']
+    tg = np.gradient(PB, axis=0); tg /= np.linalg.norm(tg, axis=1, keepdims=True)
+    nB = np.stack([-tg[:, 1], tg[:, 0]], 1)
+    side = 1 if _bilinear(img10.mean(2), *[((PB + nB * 5)[:, j] - (ox, oy)[j]) * 10 - .5 for j in (0, 1)]).mean() > \
+        _bilinear(img10.mean(2), *[((PB - nB * 5)[:, j] - (ox, oy)[j]) * 10 - .5 for j in (0, 1)]).mean() else -1
+    Bi = PB + nB * side * (wB / 2 + 0.6)
+    p1, d1 = lp(1.0)
+    above = lambda q: (d1[0] * (q[1] - p1[1]) - d1[1] * (q[0] - p1[0])) < -2.5
+    keepC = [q for q in PC if not above(q)]                     # C only up to 'full' (above it it never shows)
+    g['C'] = [[round(float(x), 2), round(float(y), 2)] for x, y in simplify([tuple(q) for q in keepC], 0.08)]
+    Bi = [q for q in Bi if not above(q)]
+    region = Bi + region_far + [tuple(p1 + d1 * far_len)]
+    m = Image.new('L', (W10, H10), 0)
+    IDr.Draw(m).polygon([T(x, y) for x, y in region], fill=255)
+    m = np.asarray(m) > 0
+    tex = img10.copy()
+    for (a0, b0, a1, b1) in label_boxes:                       # labels out: rows filled in from their sides
+        y0, y1, x0, x1 = int((b0 - oy) * 10), int((b1 - oy) * 10), int((a0 - ox) * 10), int((a1 - ox) * 10)
+        for r in range(y0, y1):
+            l_, r_ = tex[r, x0 - 1].copy(), tex[r, x1].copy()
+            tex[r, x0:x1] = l_ + (r_ - l_) * np.linspace(0, 1, x1 - x0)[:, None]
+    red = (tex[..., 0] - np.maximum(tex[..., 1], tex[..., 2])) > 40
+    tex[red] = 0
+    tex[~m] = 0
+    xs_ = [q[0] for q in region]; ys_ = [q[1] for q in region]
+    fill = vectorize_x10(tex, origin, (min(xs_) - 1, min(ys_) - 1, max(xs_) + 1, max(ys_) + 1),
+                         list(range(6, 250, 8)), key=lambda a: a.mean(-1), blur=4)
+    # static extras: white not explained by A / B, outside the level region, and the top corner (minus A)
+    lm = Image.new('L', (W10, H10), 0); d = IDr.Draw(lm)
+    for nm in ('A', 'B'):
+        P_, w_ = lines[nm]
+        d.line([T(x, y) for x, y in P_], fill=255, width=int((w_ + 1.6) * 10), joint='curve')
+    lm = np.asarray(lm) > 0
+    tb = np.zeros_like(m)
+    x0t, y0t, x1t, y1t = top_box
+    tb[int((y0t - oy) * 10):int((y1t - oy) * 10), int((x0t - ox) * 10):int((x1t - ox) * 10)] = True
+    la = Image.new('L', (W10, H10), 0)
+    IDr.Draw(la).line([T(x, y) for x, y in lines['A'][0]], fill=255, width=int((lines['A'][1] + 1.6) * 10), joint='curve')
+    la = np.asarray(la) > 0
+    ex = img10.copy()
+    for (a0, b0, a1, b1) in label_boxes:
+        ex[int((b0 - oy) * 10):int((b1 - oy) * 10), int((a0 - ox) * 10):int((a1 - ox) * 10)] = 0
+    near = Image.new('L', (W10, H10), 0)                       # only next to A and B (no neighbouring readings)
+    for nm in ('A', 'B'):
+        P_, w_ = lines[nm]
+        IDr.Draw(near).line([T(x, y) for x, y in P_], fill=255, width=int((w_ + 14) * 10), joint='curve')
+    keep = ((~lm & ~m & (np.asarray(near) > 0)) | (tb & ~la)) & ~red
+    ex[~keep] = 0
+    def white(a):
+        v = a.min(-1); core, ok_ = v >= 200, v >= 90
+        for _ in range(300):
+            g_ = core.copy()
+            g_[1:] |= core[:-1]; g_[:-1] |= core[1:]; g_[:, 1:] |= core[:, :-1]; g_[:, :-1] |= core[:, 1:]
+            g_ &= ok_
+            if (g_ == core).all():
+                break
+            core = g_
+        return np.where(core, v, 0)
+    allx = [q[0] for nm in ('A', 'B') for q in lines[nm][0]]; ally = [q[1] for nm in ('A', 'B') for q in lines[nm][0]]
+    extras = vectorize_x10(ex, origin, (min(allx) - 6, min(ally) - 6, max(allx) + 14, max(ally) + 6),
+                           list(range(90, 256, 14)), key=white, blur=1.5)
+    # the bar, local to the 'full' point
+    nb = np.array([-d1[1], d1[0]])
+    bimg = (img10 if bar_img is None else bar_img).copy()
+    for (a0, b0, a1, b1) in label_boxes:                       # a label over the bar: filled in from its sides
+        y0, y1, x0, x1 = int((b0 - oy) * 10), int((b1 - oy) * 10), int((a0 - ox) * 10), int((a1 - ox) * 10)
+        for r in range(y0, y1):
+            l_, r_ = bimg[r, x0 - 1].copy(), bimg[r, x1].copy()
+            bimg[r, x0:x1] = l_ + (r_ - l_) * np.linspace(0, 1, x1 - x0)[:, None]
+    bar = vectorize_x10(bimg, origin, bar_box, [8, 16, 24] + list(range(32, 256, 12)),
+                        key=lambda a: np.where(a[..., 0] - a[..., 1:].max(-1) > np.minimum(25, a[..., 0] * 0.5), a[..., 0], 0))
+    NZ = lambda pp: [[round(x / W, 6), round(y / H, 6)] for x, y in pp]
+    lay = lambda L_: [{'level': l_['level'], 'color': l_['color'], 'polys': [NZ(q) for q in l_['polys']]} for l_ in L_]
+    g['levels'] = lv
+    g['fill_layers'] = lay(fill)
+    g['extras'] = lay(extras)
+    g['bar_layers'] = [{'level': l_['level'], 'color': l_['color'],
+                        'polys': [[[round(float(np.dot(np.array(q) - p1, d1)), 2), round(float(np.dot(np.array(q) - p1, nb)), 2)]
+                                   for q in poly] for poly in l_['polys']]} for l_ in bar]
+    for nm in ('A', 'B', 'C'):
+        g[nm] = NZ(g[nm])
+    return g
+
+
+def apply_gauge(el, g, about):
+    """Replace a gauge element's measured fields by the 10x rebuild (labels, reserve and overlays kept)."""
+    for k in [k for k in el if k not in ('labels', 'reserve', 'overlay', 'mirror_axis', 'scale', 'photo_value')]:
+        el.pop(k)
+    el['_about'] = about
+    el['A'], el['A_width'] = g['A'], g['A_width']
+    el['B'], el['B_width'], el['B_corner'], el['B_tail'] = g['B'], g['B_width'], g['B'][0], 0
+    el['C'], el['C_width'] = g['C'], g['C_width']
+    el['colors'] = {'line': g['B_color'], 'A': g['A_color'], 'C': g['C_color']}
+    el['levels'] = g['levels']
+    el['fill'] = {'layers': g['fill_layers'], '_about': "track, C, the 1/2 tick and the lit fill as photographed (full), "
+                  "between B's inner edge and the fill's far side: colour layers cut live at the level"}
+    el['extras'] = g['extras']
+    el['bar'] = {'layers': g['bar_layers'], '_about': "the bar at 'full', in px along / across its level line from its point on C"}
+    el['_scale_lines'] = g['_scale_lines']
+
+
 def main():
     what = sys.argv[1] if len(sys.argv) > 1 else 'blade'
     if what == 'revs':                                        # trace_id7.py revs id7/Corsa: into its config.json
@@ -728,134 +992,117 @@ def main():
         cfg['elements']['center'] = dict(c, **{k: v for k, v in old.items() if k.startswith('_') or k not in c})
         json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
         print('center -> ' + os.path.relpath(path, ROOT))
-    if what == 'fill10':                                      # trace_id7.py fill10 id7/Strada id7/Corsa
-        sys.path.insert(0, HERE)
-        import gen_id7 as G
-        from PIL import ImageDraw as IDr
-        path0 = os.path.join(ROOT, 'layouts', sys.argv[2], 'config.json')
-        cfg = json.load(open(path0, encoding='utf-8'))
-        el = cfg['elements']['fuel']
-        A_, B_, C_ = G.fuel_paths(cfg)
-        p_, d_ = G.level_point(cfg, C_, 1.0)
-        top = (p_[0] + d_[0] * 120, p_[1] + d_[1] * 120)
-        poly = C_ + [(C_[-1][0] + 30, C_[-1][1] - 4), top]
-        ox, oy = 190, 400
-        img10 = load_x10('M8_fuel_x10').copy()
-        h10, w10 = img10.shape[:2]
-        m = Image.new('L', (w10, h10), 0)
-        IDr.Draw(m).polygon([((x - ox) * 10, (y - oy) * 10) for x, y in poly], fill=255)
-        m = np.asarray(m) > 0
-        # the labels and the level bar out: each of their rows filled in from its two sides
-        cut = [(257.5, 428.5, 270.5, 449.5), (268.5, 490.5, 312.5, 511.5), (322.5, 535.5, 343.5, 557.5)]
-        R_, G_, B_c = img10[..., 0], img10[..., 1], img10[..., 2]
-        redm = (R_ - np.maximum(G_, B_c)) > 40
-        for (a0, b0, a1, b1) in cut:
-            y0, y1, x0, x1 = int((b0 - oy) * 10), int((b1 - oy) * 10), int((a0 - ox) * 10), int((a1 - ox) * 10)
-            for r in range(y0, y1):
-                l_, r_ = img10[r, x0 - 1], img10[r, x1]
-                img10[r, x0:x1] = l_ + (r_ - l_) * np.linspace(0, 1, x1 - x0)[:, None]
-        img10[redm] = 0
-        img10[~m] = 0
-        lay = vectorize_x10(img10, (ox, oy), (min(x for x, _ in poly) - 1, min(y for _, y in poly) - 1, 370, 600),
-                            list(range(6, 250, 8)), key=lambda a: a.mean(-1), blur=6)
-        L_ = [{'level': l_['level'], 'color': l_['color'],
-               'polys': [[[round(x / W, 6), round(y / H, 6)] for x, y in q] for q in l_['polys']]} for l_ in lay]
-        for lo_ in sys.argv[2:]:
-            path = os.path.join(ROOT, 'layouts', lo_, 'config.json')
-            c2 = json.load(open(path, encoding='utf-8'))
-            c2['elements']['fuel']['fill']['layers'] = L_
-            c2['elements']['fuel']['fill']['_layers'] = ("the lit fill as photographed (full tank), vectorized at 10x: "
-                "luminance layers (labels and the red bar filled in from their sides, blur 0.6 px), painted flat and "
-                "clipped live to the region under the level")
-            json.dump(c2, open(path, 'w', encoding='utf-8'), indent=1)
-        print('fill layers', len(L_), sum(len(l_['polys']) for l_ in L_))
-    if what == 'bar10':                                       # trace_id7.py bar10 id7/Strada id7/Corsa
-        sys.path.insert(0, HERE)
-        import gen_id7 as G
+    if what == 'fuel10':                                      # trace_id7.py fuel10 id7/Strada id7/Corsa
         cfg = json.load(open(os.path.join(ROOT, 'layouts', sys.argv[2], 'config.json'), encoding='utf-8'))
-        A_, B_, C_ = G.fuel_paths(cfg)
-        p_, d_ = G.level_point(cfg, C_, 1.0)
-        n_ = np.array([-d_[1], d_[0]])
-        img10 = load_x10('M8_fuel_x10').copy()
-        a0, b0, a1, b1 = 257.5, 428.5, 270.5, 449.5             # the '1' over the bar: filled in from its sides
-        y0, y1, x0, x1 = int((b0 - 400) * 10), int((b1 - 400) * 10), int((a0 - 190) * 10), int((a1 - 190) * 10)
-        for r in range(y0, y1):
-            l_, r_ = img10[r, x0 - 1].copy(), img10[r, x1].copy()
-            img10[r, x0:x1] = l_ + (r_ - l_) * np.linspace(0, 1, x1 - x0)[:, None]
-        lay = vectorize_x10(img10, (190, 400), (232, 428, 312, 456), [8, 16, 24] + list(range(32, 256, 12)),
-                            key=lambda a: np.where(a[..., 0] - a[..., 1:].max(-1) > np.minimum(25, a[..., 0] * 0.5), a[..., 0], 0))
-        # local coordinates: u along the level line from its point on C, w across it
-        loc = [{'level': l_['level'], 'color': l_['color'],
-                'polys': [[[round(float(np.dot(np.array(q) - p_, d_)), 2), round(float(np.dot(np.array(q) - p_, n_)), 2)]
-                           for q in poly] for poly in l_['polys']]} for l_ in lay]
+        seeds = {k: np.array(v, float) for k, v in SEEDS_FUEL.items()}
+        g = gauge10_build(load_x10('M8_fuel_x10'), (190, 400), seeds,
+                          [(0.0, 150.63, -0.375), (0.25, 129.89, -0.325), (0.5, 79.17, -0.325), (0.75, 26.97, -0.2), (1.0, 0.0, -0.142)],
+                          [(257.5, 428.5, 270.5, 449.5), (268.5, 490.5, 312.5, 511.5), (322.5, 535.5, 343.5, 557.5)],
+                          (232, 428, 312, 456), (224, 412, 252, 434), [(352, 566), (366, 552), (352, 500), (330, 462), (305, 440)],
+                          anchor=(240.4, 445.5))                # the scale lines' arcs were read from there (dark lines, bar)
+        about = ("The fuel gauge, rebuilt on BMW M GmbH's photo only (M8 Competition, M View), at 10x on the display grid "
+                 "(M8_fuel_x10.png, not in git): A, B, C followed as ridges across the lines (centres, widths, colours); "
+                 "the scale (levels: arc position on C and slope of each line) read from the dark scale lines in the lit fill, "
+                 "'full' from the red bar; the ticks and the top corner as static white layers (extras); track, C and fill "
+                 "as colour layers cut live at the level; the bar local to its level point; labels and reserve as layers.")
         for lo_ in sys.argv[2:]:
             path = os.path.join(ROOT, 'layouts', lo_, 'config.json')
             c2 = json.load(open(path, encoding='utf-8'))
-            c2['elements']['fuel']['bar']['layers'] = loc
-            c2['elements']['fuel']['bar']['_layers'] = ("the level bar as photographed at full, vectorized at 10x, in px "
-                "along (u) and across (w) the level line from its point on C: moved and turned with the level")
+            apply_gauge(c2['elements']['fuel'], g, about)
             json.dump(c2, open(path, 'w', encoding='utf-8'), indent=1)
-        print('bar layers', len(loc), sum(len(l_['polys']) for l_ in loc))
-    if what == 'tempfill10':                                  # trace_id7.py tempfill10 id7/Corsa
-        sys.path.insert(0, HERE)
-        import gen_id7 as G
+        print('fuel ->', sys.argv[2:], {k: (len(v) if isinstance(v, list) else v) for k, v in g.items() if not k.startswith('_')})
+    if what == 'tempmirror10':                                # the temp photo mirrored onto the fuel's 10x grid
+        ax = float(sys.argv[2])
+        fx_, tx_ = load_x10('M8_fuel_x10'), load_x10('M8_temp_x10')
+        off = int(round((2 * ax - 190 - 1550) * 10))
+        jj = off - 1 - np.arange(fx_.shape[1]); ok_ = (jj >= 0) & (jj < tx_.shape[1])
+        tm = np.zeros_like(fx_); tm[:, ok_] = tx_[:, jj[ok_]]
+        Image.fromarray(tm.astype(np.uint8)).save(os.path.join(ROOT, 'design', 'refs', 'id7', 'M8_temp_mirror_x10.png'))
+        print('ok')
+    if what == 'temp10':                                      # trace_id7.py temp10 id7/Corsa
         from PIL import ImageDraw as IDr
         path = os.path.join(ROOT, 'layouts', sys.argv[2], 'config.json')
         cfg = json.load(open(path, encoding='utf-8'))
-        el = cfg['elements']['temp']
-        ax = el['mirror_axis']
-        lo, hi = el['scale']
-        v_ph = (el['photo_value'] - lo) / (hi - lo)
-        A_, B_, C_ = G.fuel_paths(cfg, 'temp')                # the mirrored frame
-        fx = load_x10('M8_fuel_x10')                          # display x 190..370
-        tx = load_x10('M8_temp_x10')                          # display x 1550..1730
-        # the temp photo in the mirrored frame on the fuel's 10x grid: display X <-> 2 ax - X
-        off = int(round((2 * ax - 190 - 1550) * 10))          # fuel column i <-> temp column off - 1 - i
-        ii = np.arange(fx.shape[1]); jj = off - 1 - ii
-        ok_ = (jj >= 0) & (jj < tx.shape[1])
-        tm = np.zeros_like(fx); tm[:, ok_] = tx[:, jj[ok_]]
-        def inpaint(img10, boxes, ox):
-            for (a0, b0, a1, b1) in boxes:
-                y0, y1, x0, x1 = int((b0 - 400) * 10), int((b1 - 400) * 10), int((a0 - ox) * 10), int((a1 - ox) * 10)
-                for r in range(y0, y1):
-                    l_, r_ = img10[r, x0 - 1].copy(), img10[r, x1].copy()
-                    img10[r, x0:x1] = l_ + (r_ - l_) * np.linspace(0, 1, x1 - x0)[:, None]
+        f, tp = cfg['elements']['fuel'], cfg['elements']['temp']
+        ax = tp['mirror_axis']
         mb = lambda b: (2 * ax - b[2], b[1], 2 * ax - b[0], b[3])
-        t_boxes = [mb(b) for b in [(1611.5, 438, 1659, 458.5), (1596.5, 489.5, 1645, 510), (1565, 533.5, 1601.5, 554)]]
-        inpaint(tm, t_boxes, 190)
-        fz = fx.copy()
-        inpaint(fz, [(257.5, 428.5, 270.5, 449.5), (268.5, 490.5, 312.5, 511.5), (322.5, 535.5, 343.5, 557.5)], 190)
-        # the bar: traced on the temp photo, local to its level point
-        p_, d_ = G.level_point(cfg, C_, v_ph, 'temp')
-        n_ = np.array([-d_[1], d_[0]])
-        redk = lambda a: np.where(a[..., 0] - a[..., 1:].max(-1) > np.minimum(25, a[..., 0] * 0.5), a[..., 0], 0)
-        tb = tm.copy()
-        lay = vectorize_x10(tb, (190, 400), (p_[0] - 4, p_[1] - 16, p_[0] + 70, p_[1] + 10),
-                            [8, 16, 24] + list(range(32, 256, 12)), key=redk)
-        el['bar']['layers'] = [{'level': l_['level'], 'color': l_['color'],
-                                'polys': [[[round(float(np.dot(np.array(q) - p_, d_)), 2), round(float(np.dot(np.array(q) - p_, n_)), 2)]
-                                           for q in poly] for poly in l_['polys']]} for l_ in lay]
-        el['bar']['_layers'] = "the temperature bar as photographed (106 °C), vectorized at 10x on the mirrored photo, local to its level point"
-        # the fill: the temp photo under its level line, the fuel's above it (the photo stops at 106 °C)
-        P0, D0 = np.array(p_), np.array(d_)
-        H10, W10 = fx.shape[:2]
+        t_labels = [mb(b) for b in [(1611.5, 438, 1659, 458.5), (1596.5, 489.5, 1645, 510), (1565, 533.5, 1601.5, 554)]]
+        f_labels = [(257.5, 428.5, 270.5, 449.5), (268.5, 490.5, 312.5, 511.5), (322.5, 535.5, 343.5, 557.5)]
+        tm = load_x10('M8_temp_mirror_x10')
+        fx_ = load_x10('M8_fuel_x10').copy()
+        for (a0, b0, a1, b1) in f_labels:                     # the fuel's labels out before it lends its fill
+            y0, y1, x0, x1 = int((b0 - 400) * 10), int((b1 - 400) * 10), int((a0 - 190) * 10), int((a1 - 190) * 10)
+            for r in range(y0, y1):
+                l_, r_ = fx_[r, x0 - 1].copy(), fx_[r, x1].copy()
+                fx_[r, x0:x1] = l_ + (r_ - l_) * np.linspace(0, 1, x1 - x0)[:, None]
+        # A and B on both photos -> x_t = a x_f + b y + c (least squares on points at equal y)
+        seeds_t = {k: np.array(v, float) for k, v in SEEDS_FUEL.items()}
+        _, lt = gauge10(tm, (190, 400), seeds_t, [], (240, 495, 300, 520))
+        rows = []
+        for k in ('A', 'B'):
+            Ft = np.array(f[k]) * [W, H]; Tt = lt[k][0]
+            Fs, Ts = Ft[np.argsort(Ft[:, 1])], Tt[np.argsort(Tt[:, 1])]
+            for y in np.arange(max(Fs[0, 1], Ts[0, 1]) + 3, min(Fs[-1, 1], Ts[-1, 1]) - 3, 2.0):
+                xf, xt = np.interp(y, Fs[:, 1], Fs[:, 0]), np.interp(y, Ts[:, 1], Ts[:, 0])
+                if abs(np.gradient(Fs[:, 0], Fs[:, 1])[np.searchsorted(Fs[:, 1], y) - 1]) < 2.5:
+                    rows.append((xf, y, xt))
+        R_ = np.array(rows)
+        sol = np.linalg.lstsq(np.c_[R_[:, 0], R_[:, 1], np.ones(len(R_))], R_[:, 2], rcond=None)[0]
+        res = R_[:, 2] - np.c_[R_[:, 0], R_[:, 1], np.ones(len(R_))] @ sol
+        print('fuel -> temp: x_t = %.4f x + %.4f y + %.2f, residual rms %.2f px' % (*sol, np.sqrt((res ** 2).mean())))
+        # the fuel's 10x image warped onto the temp grid
+        H10, W10 = tm.shape[:2]
         Xg, Yg = np.meshgrid(190 + (np.arange(W10) + 0.5) / 10, 400 + (np.arange(H10) + 0.5) / 10)
-        below = (D0[0] * (Yg - P0[1]) - D0[1] * (Xg - P0[0])) > 3.0
-        comb = np.where(below[..., None], tm, fz)
-        comb[(comb[..., 0] - np.maximum(comb[..., 1], comb[..., 2])) > 40] = 0
-        pf, df = G.level_point(cfg, C_, 1.0, 'temp')
-        poly = C_ + [(C_[-1][0] + 30, C_[-1][1] - 4), (pf[0] + df[0] * 120, pf[1] + df[1] * 120)]
+        Xf = (Xg - sol[1] * Yg - sol[2]) / sol[0]
+        warped = np.stack([_bilinear(fx_[..., c], (Xf - 190) * 10 - .5, (Yg - 400) * 10 - .5) for c in range(3)], -1)
+        # the temp photo's level: the line along its bar (where its own C starts)
+        PCt = lt['C'][0]
+        pt = PCt[0]; kb = -0.325
+        above = (Yg - pt[1]) - kb * (Xg - pt[0]) < -16.0      # clear of the photo's own bar
+        # the level region (B inner edge .. far side): above the photo level -> the warped fuel, else the temp photo
+        PB, wB = lt['B']
+        tg = np.gradient(PB, axis=0); tg /= np.linalg.norm(tg, axis=1, keepdims=True); nB = np.stack([-tg[:, 1], tg[:, 0]], 1)
+        Bi = PB + nB * (wB / 2 + 0.6)
+        if _bilinear(tm.mean(2), (Bi[:, 0] - 190) * 10, (Bi[:, 1] - 400) * 10).mean() < _bilinear(tm.mean(2), ((PB - nB * 3)[:, 0] - 190) * 10, ((PB - nB * 3)[:, 1] - 400) * 10).mean():
+            Bi = PB - nB * (wB / 2 + 0.6)
         m = Image.new('L', (W10, H10), 0)
-        IDr.Draw(m).polygon([((x - 190) * 10, (y - 400) * 10) for x, y in poly], fill=255)
-        comb[np.asarray(m) == 0] = 0
-        lay = vectorize_x10(comb, (190, 400), (min(x for x, _ in poly) - 1, min(y for _, y in poly) - 1, 370, 600),
-                            list(range(6, 250, 8)), key=lambda a: a.mean(-1), blur=6)
-        el['fill']['layers'] = [{'level': l_['level'], 'color': l_['color'],
-                                 'polys': [[[round(x / W, 6), round(y / H, 6)] for x, y in q] for q in l_['polys']]} for l_ in lay]
-        el['fill']['_layers'] = ("the lit fill vectorized at 10x in the mirrored frame: the temperature photo under its "
-                                 "106 °C level, the fuel photo above it (no data there)")
+        IDr.Draw(m).polygon([((x - 190) * 10, (y - 400) * 10) for x, y in list(map(tuple, Bi)) + [(352, 566), (372, 548), (372, 410), (Bi[0][0], 410)]], fill=255)
+        reg = np.asarray(m) > 0
+        comp = np.where((reg & above)[..., None], warped, tm).astype(np.float32)
+        # the C seed for the upper part: the fuel's C through the map
+        Cf = np.array(f['C']) * [W, H]
+        seeds_t['C'] = np.c_[sol[0] * Cf[:, 0] + sol[1] * Cf[:, 1] + sol[2], Cf[:, 1]]
+        # the scale: the fuel's levels carried over (arc positions on the fuel's C -> points -> the temp C)
+        picks = [(q[0], np.array([sol[0] * q[1] + sol[1] * q[2] + sol[2], q[2]]), round(float(k_[1] / sol[0]), 3))
+                 for q, k_ in zip(f['levels']['pts'], f['levels']['slope'])]
+        print('temp levels', picks)
+        v_ph = (tp['photo_value'] - tp['scale'][0]) / (tp['scale'][1] - tp['scale'][0])
+        # the bar box around the photo's bar, label boxes: the temp's (mirrored)
+        g = gauge10_build(comp, (190, 400), seeds_t, picks, t_labels, (238, 488, 300, 522), (224, 412, 252, 434), [(352, 566), (366, 552), (352, 500), (330, 462), (305, 440)], bar_img=tm)
+        # the bar was traced at the photo's level (v_ph), not at 'full': re-express it local to that level point
+        lv = g['levels']
+        Cn = np.array(densify_np(np.array(g['C']) * [W, H], 0.25))
+        carc = np.r_[0, np.cumsum(np.linalg.norm(np.diff(Cn, axis=0), axis=1))]
+        def lpt(v):
+            ar = [float(carc[int(np.argmin(np.linalg.norm(Cn - np.array(q[1:]), axis=1)))]) for q in lv['pts']]
+            a_ = np.interp(v, [q[0] for q in lv['pts']], ar)
+            k_ = np.interp(v, [q[0] for q in lv['slope']], [q[1] for q in lv['slope']])
+            d_ = np.array([1.0, k_]); return Cn[int(np.argmin(np.abs(carc - a_)))], d_ / np.linalg.norm(d_)
+        p1, d1 = lpt(1.0); pv, dv = lpt(v_ph)
+        n1, nv = np.array([-d1[1], d1[0]]), np.array([-dv[1], dv[0]])
+        for l_ in g['bar_layers']:
+            l_['polys'] = [[[round(float(np.dot(p1 + d1 * u + n1 * w_ - pv, dv)), 2), round(float(np.dot(p1 + d1 * u + n1 * w_ - pv, nv)), 2)]
+                            for u, w_ in poly] for poly in l_['polys']]
+        about = ("The temperature gauge, rebuilt on BMW M GmbH's photo only, in the frame mirrored about x %.1f (drawn by the "
+                 "fuel gauge's code, then mirrored): A, B, the extras, the bar and the fill under 106 °C from its own photo at "
+                 "10x; above 106 °C (not shown on the photo) C, the fill and the scale come from the fuel gauge's photo warped "
+                 "onto it by the fit of their A and B lines (x_t = %.4f x + %.4f y + %.2f)." % (ax, *sol))
+        apply_gauge(tp, g, about)
+        tp['fill']['_about'] += "; under 106 °C the temperature's own photo, above it the fuel's (warped)"
+        tp['bar']['_about'] = "the bar as photographed at 106 °C, local to that level point"
+        tp['reserve']['hidden'] = True
         json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
-        print('temp bar', sum(len(l_['polys']) for l_ in el['bar']['layers']), 'fill', sum(len(l_['polys']) for l_ in el['fill']['layers']))
+        print('temp ->', sys.argv[2])
     if what == 'labels10':                                    # trace_id7.py labels10 id7/Strada id7/Corsa
         def white(a):                                         # the glyphs only: pixels joined to a glyph's core
             v = a.min(-1)
@@ -894,7 +1141,7 @@ def main():
                 cfg['elements']['temp']['labels']['_layers'] = "150, 100, 50, °C and the oil can, the same way"
             json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
             print('labels -> ' + lo_, len(FL), len(TL))
-    if what == 'temp10':                                      # trace_id7.py temp10 id7/Corsa: hot (red) / cold (blue)
+    if what == 'tempzones10':                                 # trace_id7.py tempzones10 id7/Corsa: hot (red) / cold (blue)
         img10 = load_x10('M8_temp_x10')
         lv = [8, 16, 24] + list(range(32, 256, 12))
         red = lambda a: np.where(a[..., 0] - a[..., 1:].max(-1) > np.minimum(25, a[..., 0] * 0.5), a[..., 0], 0)
