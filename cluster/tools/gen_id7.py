@@ -72,11 +72,15 @@ def interp(stops, v):
 def fuel_paths(cfg):
     el = cfg['elements']['fuel']
     W, H = cfg['grid']
-    A = densify(px(cfg, el['A']))
-    B = offset(A, el['B_offset'])                               # B: A's parallel, from its top end down to x 237
-    B = [p for p in B if (p[0] <= el['B_end_x'] * W or p[1] < 560) and p[1] >= el['B_corner'][1] * H + 1.5]
-    B = px(cfg, [el['B_corner']]) + B                           # its top: a corner turning into the '1' wedge
-    C = densify(px(cfg, el['C']))
+    A = densify(px(cfg, el['A']), step=0.75)
+    B_raw = offset(A, el['B_offset'])                           # B: A's parallel, from its top corner down to x 237
+    B_corner_px = px(cfg, [el['B_corner']])[0]
+    B_body = [
+        p for p in B_raw
+        if p[0] <= el['B_end_x'] * W and p[1] >= B_corner_px[1] + 2.0
+    ]
+    B = [B_corner_px] + B_body                                  # its top: a corner turning into the '1' wedge
+    C = densify(px(cfg, el['C']), step=0.75)
     return A, B, C
 
 
