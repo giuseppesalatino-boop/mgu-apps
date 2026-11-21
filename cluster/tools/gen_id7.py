@@ -108,19 +108,28 @@ def _line(d, pts, w, fill):
         d.ellipse([x * SS - r, y * SS - r, x * SS + r, y * SS + r], fill=fill)
 
 
-def draw_fuel_static(img, cfg):
-    """Rail (A, B, the cap), track, ticks, the lit edge C (fading at its right end), reserve mark (supersampled canvas)."""
+def _strip(d, pts, w0, w1, c0, c1, steps=None):
+    """A line from pts[0] to pts[-1] whose width and colour (RGBA) go from w0/c0 to w1/c1 (supersampled draw)."""
+    a, b = np.array(pts[0], float), np.array(pts[-1], float)
+    v = b - a; L = np.linalg.norm(v); v /= L; nn = np.array([-v[1], v[0]])
+    steps = steps or max(8, int(L * 2))
+    for s in range(steps):
+        t0, t1 = s / steps, (s + 1) / steps
+        hw = (w0 + (w1 - w0) * (t0 + t1) / 2) / 2
+        p0, p1 = a + v * L * t0, a + v * L * t1
+        quad = [p0 + nn * hw, p1 + nn * hw, p1 - nn * hw, p0 - nn * hw]
+        c = tuple(int(round(c0[k] + (c1[k] - c0[k]) * (t0 + t1) / 2)) for k in range(len(c0)))
+        d.polygon([(q[0] * SS, q[1] * SS) for q in quad], fill=c)
+
+
+def draw_fuel_static(img, cfg, trails=True):
+    """The fixed part (supersampled canvas): the reserve, the thin line A, the thicker line B with its hook and its thin
+    end, the triangles on B and the grey trails fading towards the labels."""
     el = cfg['elements']['fuel']
     W, H = cfg['grid']
     col = el['colors']
     A, B, C = fuel_paths(cfg)
     d = ImageDraw.Draw(img)
-    # the track: between B (from where it turns down) and C
-    i0, _ = nearest(B, C[0])
-    track = B[i0:] + list(reversed(C[:nearest(C, B[-1])[0] + 1]))
-    d.polygon([(x * SS, y * SS) for x, y in track], fill=tuple(col['track']))
-    if 'track_ext' in el:                                       # past B's end, under C, over the reserve's left part
-        d.polygon([(x * SS, y * SS) for x, y in px(cfg, el['track_ext'])], fill=tuple(col['track']))
     # the reserve mark, a horizontal gradient
     rp = px(cfg, el['reserve']['poly'])
     m = Image.new('L', img.size, 0)
@@ -134,6 +143,10 @@ def draw_fuel_static(img, cfg):
     fill = Image.fromarray(np.clip(band + 0.5, 0, 255).astype(np.uint8), 'RGB').convert('RGBA')
     img.paste(fill, (0, y0), m.crop((0, y0, img.size[0], y1)))
     lc = tuple(col['line'])
+    tr = el['trail']
+    for t in (el.get('trails', []) if trails else []):         # grey, fading out towards the label
+        pts = px(cfg, t['pts'])
+        _strip(d, pts, t['width'], t['width'] * 0.7, tuple(tr['c0']), tuple(tr['c1']))
     _line(d, A, el['A_width'], lc)
     tail = el.get('B_tail', 0)
     _line(d, B[:len(B) - tail] if tail else B, el['B_width'], lc)
@@ -144,26 +157,29 @@ def draw_fuel_static(img, cfg):
         hw = el['B_width'] / 2 * np.linspace(1, 0.12, len(pts))[:, None]
         poly = list(pts + nn * hw) + list((pts - nn * hw)[::-1])
         d.polygon([(x * SS, y * SS) for x, y in poly], fill=lc)
-    tr = el.get('trail')
-    for t in el.get('triangles', []):                           # on B's inner side, apex towards C, with a trail
+    for t in el.get('triangles', []):                           # on B's inner side, apex towards C
         p, dv = level_point(cfg, C, t['at'])
         i, q = nearest(B, p)
         tg = np.array(B[min(i + 1, len(B) - 1)]) - np.array(B[max(i - 1, 0)]); tg /= np.linalg.norm(tg)
         inw = np.array(p) - np.array(q); inw /= np.linalg.norm(inw)
         q = np.array(q) + inw * el['B_width'] / 2 * 0.8
         apex = q + inw * t['h']
-        if tr:
-            _line(d, [tuple(apex), tuple(p)], tr['width'], tuple(tr['color']))
         tri = [q + tg * t['half'], apex, q - tg * t['half']]
         d.polygon([(x * SS, y * SS) for x, y in tri], fill=lc)
-    # C, its right end fading out
-    fx0, fx1 = el['C_fade'][0] * W, el['C_fade'][1] * W
-    m = Image.new('L', img.size, 0)
-    _line(ImageDraw.Draw(m), C, el['C_width'], 255)
-    a = np.asarray(m).astype(np.float32)
-    a *= np.clip((fx1 - xx) / (fx1 - fx0), 0, 1)[None, :]
-    layer = Image.new('RGBA', img.size, lc + (255,))
-    img.paste(layer, (0, 0), Image.fromarray(a.astype(np.uint8)))
+
+
+def _rp_mask(cfg):
+    """The reserve mark's shape at grid size (the track and C keep off it)."""
+    W, H = cfg['grid']
+    m = Image.new('L', (W * SS, H * SS), 0)
+    ImageDraw.Draw(m).polygon([(x * SS, y * SS) for x, y in px(cfg, cfg['elements']['fuel']['reserve']['poly'])], fill=255)
+    return m.resize((W, H), Image.BOX)
+
+
+def _below(cfg, p, dvec, X, Y):
+    """1 under the level line through p (direction dvec), 0 above, anti-aliased over a pixel."""
+    s = dvec[0] * (Y - p[1]) - dvec[1] * (X - p[0])
+    return np.clip(s + 0.5, 0, 1)
 
 
 def draw_fuel_labels(img, cfg):
@@ -203,7 +219,23 @@ def draw_fuel_level(img, cfg, v):
     st = el['fill']['dist']
     k = np.interp(dist, [s[0] for s in st], [s[1] for s in st])
     fx0, fx1 = el['fill']['fade_x'][0] * W, el['fill']['fade_x'][1] * W
-    k = k * np.clip((fx1 - X) / (fx1 - fx0), 0, 1) * m
+    k = k * np.clip((fx1 - X) / (fx1 - fx0), 0, 1) * m * _below(cfg, p, dvec, X, Y)
+    # the grey track between B and C and C itself, both only under the level
+    big = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(big)
+    Bi = offset(B, el['B_width'] / 2)
+    i0 = nearest(Bi, C[0])[0]
+    trk = Bi[i0:] + list(reversed(C[:nearest(C, B[-1])[0] + 1]))
+    bd.polygon([(x * SS, y * SS) for x, y in trk], fill=tuple(col['track']) + (255,))
+    if 'track_ext' in el:
+        bd.polygon([(x * SS, y * SS) for x, y in px(cfg, el['track_ext'])], fill=tuple(col['track']) + (255,))
+    _line(bd, C, el['C_width'], tuple(col['line']) + (255,))
+    lay = np.asarray(big.resize((W, H), Image.LANCZOS)).astype(np.float32)
+    XX, YY = np.meshgrid(np.arange(W) + 0.5, np.arange(H) + 0.5)
+    fx0c, fx1c = el['C_fade'][0] * W, el['C_fade'][1] * W
+    lay[..., 3] *= _below(cfg, p, dvec, XX, YY) * np.clip((fx1c - XX) / (fx1c - fx0c), 0, 1)
+    lay[..., 3] *= 1 - np.asarray(_rp_mask(cfg)).astype(np.float32) / 255
+    img.alpha_composite(Image.fromarray(np.clip(lay + 0.5, 0, 255).astype(np.uint8), 'RGBA'))
     arr = np.asarray(img).astype(np.float32)
     sub = arr[y0:y1, x0:x1, :3]
     arr[y0:y1, x0:x1, :3] = sub + (np.array(col['fill'], np.float32) - sub) * k[..., None]
@@ -253,6 +285,10 @@ def build_static(cfg):
 def draw_dynamic(img, cfg, tel):
     if 'fuel' in tel:
         img = draw_fuel_level(img, cfg, tel['fuel'])
+        W, H = cfg['grid']                                      # the rail (lines, triangles, trails) stays over the fill
+        rail = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+        draw_fuel_static(rail, cfg, trails=False)            # over the fill the trails show as lighter lines
+        img.alpha_composite(rail.resize((W, H), Image.LANCZOS))
         draw_fuel_labels(img, cfg)                              # the labels stay over the bar (as on the photo)
     return img
 
