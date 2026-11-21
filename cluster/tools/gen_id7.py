@@ -163,37 +163,30 @@ def draw_fuel_static(img, cfg, trails=True):
     if sh:
         d.polygon([(x * SS, y * SS) for x, y in px(cfg, sh['pts'])], fill=tuple(sh['color']))
     for t in el.get('triangles', []):                           # on B's inner side, apex towards C
-        p, _ = level_point(cfg, C, t['at'])
+        p, dvec = level_point(cfg, C, t['at'])
+        p_arr = np.array(p, dtype=float)
         _, q = nearest(B, p)
         q_arr = np.array(q, dtype=float)
-        p_arr = np.array(p, dtype=float)
 
-        # Direzione lungo B nel punto più vicino al livello
-        idx = nearest(B, q)[0]
-        p_prev = np.array(B[max(idx - 1, 0)], dtype=float)
-        p_next = np.array(B[min(idx + 1, len(B) - 1)], dtype=float)
-        tg = p_next - p_prev
-        norm_tg = np.linalg.norm(tg)
-        if norm_tg < 1e-6:
-            continue
-        tg /= norm_tg
+        # Intersezione della linea di livello (passante per p con direzione -dvec) con il bordo interno di B
+        Bi = offset(B, el['B_width'] / 2.0)
+        _, qb = nearest(Bi, p - dvec * np.linalg.norm(p_arr - q_arr))
+        qb_arr = np.array(qb, dtype=float)
 
-        # Normale verso l'interno (verso C)
-        inw = np.array([-tg[1], tg[0]], dtype=float)
-        if np.dot(inw, p_arr - q_arr) < 0:
-            inw = -inw
+        # 1) Tacca bianca che attraversa l'intera fascia grigia da B fino a C
+        tick_w = t.get('line_w', 2.2)
+        _line(d, [tuple(qb_arr), tuple(p_arr)], tick_w, lc)
 
-        half_len = float(t.get('half', 2.0))
-        depth = float(t.get('h', 3.0))
-        base_offset = float(el.get('B_width', 2.9)) * 0.45
-
-        base_center = q_arr + inw * base_offset
-        p_a = base_center - tg * half_len
-        p_b = base_center + tg * half_len
-        apex = base_center + inw * depth
-
-        tri = [tuple(p_a), tuple(apex), tuple(p_b)]
-        d.polygon([(x * SS, y * SS) for x, y in tri], fill=lc)
+        # 2) Invito triangolare su B (solo se h > 0, es. su 1/2)
+        if t.get('h', 0) > 0:
+            idx = nearest(Bi, qb_arr)[0]
+            tg = np.array(Bi[min(idx + 1, len(Bi) - 1)]) - np.array(Bi[max(idx - 1, 0)])
+            tg /= np.linalg.norm(tg) + 1e-9
+            inw = p_arr - qb_arr
+            inw /= np.linalg.norm(inw) + 1e-9
+            apex = qb_arr + inw * t['h']
+            tri = [tuple(qb_arr - tg * t['half']), tuple(apex), tuple(qb_arr + tg * t['half'])]
+            d.polygon([(x * SS, y * SS) for x, y in tri], fill=lc)
 
 
 def _rp_mask(cfg):
