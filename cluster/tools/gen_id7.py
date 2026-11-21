@@ -306,18 +306,261 @@ def draw_fuel_level(img, cfg, v):
     return img
 
 
+# ---------------------------------------------------------------- the rev counter (Corsa): two traced blades
+
+def _by_y(poly):
+    a = np.array(poly, float)
+    o = np.argsort(a[:, 1])
+    return a[o, 1], a[o, 0]
+
+
+def _x_on(poly, y):
+    yy, xx = _by_y(poly)
+    return np.interp(y, yy, xx)
+
+
+def blades(cfg):
+    r = cfg['elements'].get('revs', {})
+    return [r[k] for k in ('left', 'right') if k in r]
+
+
+def blade_lines(cfg, b):
+    """One blade in display px: side (+1 left blade, inwards = +x; -1 right), O / E / I densified."""
+    sd = 1 if b['side'] == 'left' else -1
+    return sd, densify(px(cfg, b['O']), 0.5), densify(px(cfg, b['E']), 0.5), densify(px(cfg, b['I']), 0.5)
+
+
+def o_inner(cfg, b, O, y):
+    """x of O's inner edge at y."""
+    sd = 1 if b['side'] == 'left' else -1
+    return _x_on(O, y) + sd * interp(b['O_width'], y) / 2
+
+
+def _profile(stops, d):
+    st = np.array(stops, float)
+    return np.interp(d, st[:, 0], st[:, 1] / st[0, 1])
+
+
+def draw_blade_body(img, cfg, b):
+    """The body's light (1x, numpy): base colour by y between E and I, E's and I's light falling off by distance,
+    each line's outer side dropping within ~1.6 px (the dark gap to O / the black outside)."""
+    W, H = cfg['grid']
+    sd, O, E, I = blade_lines(cfg, b)
+    top = [(p[0] * W, p[1] * H) for p in b['O_top']]
+    outer = top + O                                             # O and, over the '8', its thin end
+    y0 = int(min(p[1] for p in outer)) - 1
+    y1 = int(max(p[1] for p in I)) + 1
+    xs_all = [p[0] for p in outer + I]
+    x0, x1 = int(min(xs_all)) - 3, int(max(xs_all)) + 4
+    X, Y = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
+    xo, xi = _x_on(outer, Y), _x_on(I, Y)
+    e_top = min(p[1] for p in E)
+    xe = np.where(Y < e_top, xo, _x_on(E, Y))                   # no lit edge over the '8': the body starts at O
+    dE, dI = g.poly_distance(E, X, Y), g.poly_distance(I, X, Y)
+    inE = sd * (X - xe) >= 0                                    # inwards of E
+    inI = sd * (xi - X) >= 0                                    # inwards of I
+    band = inE & inI
+    gap = (sd * (X - xo) > 0) & ~inE
+    out_ = ~inI & (sd * (X - xi) < 3)
+    base = np.array(b['base'], float)
+    rgb = np.stack([np.interp(Y, base[:, 0], base[:, k]) for k in (1, 2, 3)], -1)
+    # E's light: none along the zones (they take its place), then up to its measured peak
+    z_end = max([z['y'][1] * H for z in b['zones']] or [0]) + 1.0
+    eP = np.array(b['E_peak'], float)
+    gE = np.interp(Y, eP[:, 0], eP[:, 1]) * np.clip((Y - z_end) / max(1.0, 232 - z_end), 0, 1)
+    gI = np.interp(Y, *np.array(b['I_peak'], float).T) * np.clip((Y - b['I_top'] + 3) / 3, 0, 1)
+    out_side = [[0, 1.0], [0.8, 0.55], [1.6, 0.0]]
+    LE = np.where(inE, _profile(b['glow_E'], dE), _profile(out_side, dE)) * gE
+    LI = np.where(inI, _profile(b['glow_I'], dI), _profile(out_side, dI)) * gI
+    lit = np.where(band, 1.0, 0.0)[..., None] * rgb + (np.where(band | gap, LE, 0) + np.where(band | out_, LI, 0))[..., None]
+    lit = np.clip(lit, 0, 255)
+    keep = band | gap | out_
+    arr = np.asarray(img).astype(np.float32)
+    sub = arr[y0:y1, x0:x1, :3]
+    arr[y0:y1, x0:x1, :3] = np.where(keep[..., None], np.maximum(sub, lit), sub)
+    return Image.fromarray(np.clip(arr + 0.5, 0, 255).astype(np.uint8), 'RGBA')
+
+
+def _strip_var(d, pts, widths, fill):
+    """A polyline with a width per point (supersampled draw)."""
+    a = np.array(pts, float)
+    t = np.gradient(a, axis=0)
+    t /= np.linalg.norm(t, axis=1, keepdims=True) + 1e-9
+    n = np.stack([-t[:, 1], t[:, 0]], 1) * (np.array(widths)[:, None] / 2)
+    poly = list(a + n) + list((a - n)[::-1])
+    d.polygon([(x * SS, y * SS) for x, y in poly], fill=fill)
+
+
+def draw_blade_lines(big, cfg, b, col=(250, 250, 252)):
+    """O (width by y) with its thin end over the '8', the tick wedges and the slits, the zones (supersampled canvas)."""
+    W, H = cfg['grid']
+    d = ImageDraw.Draw(big)
+    sd, O, E, I = blade_lines(cfg, b)
+    _strip_var(d, O, [interp(b['O_width'], p[1]) for p in O], col + (255,))
+    top = b['O_top']
+    for p, q in zip(top[:-1], top[1:]):                        # the thin end: brightness as measured
+        a = (p[2] + q[2]) / 2 / 255
+        c = tuple(int(round(v * min(1, a / 0.78))) for v in col) + (255,)
+        _line(d, [(p[0] * W, p[1] * H), (q[0] * W, q[1] * H)], 2.4, c)
+    for t in b['ticks']:
+        w = px(cfg, t['wedge'])
+        d.polygon([(x * SS, y * SS) for x, y in w], fill=col + (255,))
+        r = abs(w[2][1] - w[1][1]) / 2
+        cx, cy = w[1][0] - sd * r, (w[1][1] + w[2][1]) / 2
+        d.ellipse([(cx - r) * SS, (cy - r) * SS, (cx + r) * SS, (cy + r) * SS], fill=col + (255,))
+    for t in b['ticks']:
+        if t['slit']:
+            d.polygon([(x * SS, y * SS) for x, y in px(cfg, t['slit'])], fill=(0, 0, 0, 255))
+    for z in b['zones']:
+        ya, yb = z['y'][0] * H, z['y'][1] * H
+        yy = np.linspace(ya, yb, 12)
+        xin = [o_inner(cfg, b, O, y) for y in yy]
+        L = [(x + sd * z['off'][0], y) for x, y in zip(xin, yy)]
+        R = [(x + sd * z['off'][1], y) for x, y in zip(xin, yy)]
+        d.polygon([(x * SS, y * SS) for x, y in L + R[::-1]], fill=tuple(z['color']) + (255,))
+
+
+def draw_blade_floor(big, cfg, b, col=(250, 250, 252)):
+    """Under 0: the white zero line across the band and the dark red floor down to O's foot (supersampled)."""
+    d = ImageDraw.Draw(big)
+    sd, O, E, I = blade_lines(cfg, b)
+    rows, last = [], None
+    for r in b['floor']:
+        if sd * (r[2] - r[1]) > 4 and (last is None or abs(r[1] - last) < 4):
+            rows.append(r); last = r[1]
+    if len(rows) > 1:
+        ys = [r[0] for r in rows]
+        for k in range(len(rows) - 1):                          # row by row: its colour
+            a, c = rows[k], rows[k + 1]
+            q = [(a[1], a[0] - 0.5), (a[2], a[0] - 0.5), (c[2], c[0] - 0.5), (c[1], c[0] - 0.5)]
+            d.polygon([(x * SS, y * SS) for x, y in q], fill=tuple(a[3:6]) + (255,))
+    z = b.get('zero_line')
+    if z:
+        ya, yb = z['y']
+        xa = _x_on(E, (ya + yb) / 2) - sd * 2
+        d.polygon([(xa * SS, ya * SS), (z['x_end'] * SS, ya * SS), (z['x_end'] * SS, yb * SS), (xa * SS, yb * SS)],
+                  fill=col + (255,))
+
+
+def draw_blade_digits(big, cfg, b, col=(254, 254, 254)):
+    """The even numbers, each fitted into its traced box (BMW digits, supersampled)."""
+    W, H = cfg['grid']
+    for dg in b['digits']:
+        x0, y0, x1, y1 = dg['box'][0] * W, dg['box'][1] * H, dg['box'][2] * W, dg['box'][3] * H
+        tmp = Image.new('RGBA', (600, 300), (0, 0, 0, 0))
+        g.draw_number(tmp, dg['text'], 20, 150, 200, 260, col, align='left')
+        part = tmp.crop(tmp.getbbox()).resize((max(1, int(round((x1 - x0) * SS))), max(1, int(round((y1 - y0) * SS)))), Image.LANCZOS)
+        big.alpha_composite(part, (int(round(x0 * SS)), int(round(y0 * SS))))
+
+
+def rev_y(b, v, H):
+    vy = [y * H for y in b['values_y']]
+    return float(np.interp(v, np.arange(len(vy)), vy))
+
+
+def draw_rev_level(img, cfg, b, v):
+    """The live bar at v (x1000/min): the grey block from 0 up to it, the red bar, the red glow above (traced table)."""
+    W, H = cfg['grid']
+    f = b['fill']
+    sd, O, E, I = blade_lines(cfg, b)
+    yv = rev_y(b, v, H)
+    hb = (f['bar'][1] - f['bar'][0]) / 2
+    y0z = rev_y(b, 0, H)
+    # the glow: rows above the bar x 6 stops across E -> I; the photo's own base (its top row) taken off
+    gl = np.array([r for r in f['glow'] if r[0] <= 5 or max(r[1:]) < 0.95], float)
+    b0 = f.get('glow_base', 0.08)                              # the body's own red under the glow
+    amp = np.clip((gl[:, 1:] - b0) / (1 - b0), 0, 1)
+    gl = np.vstack([gl, [gl[-1, 0] + f.get('glow_tail', 12)] + [0] * 6])   # its far end fades out
+    amp = np.vstack([amp, np.zeros(6)])
+    ya, yb = int(yv - hb - gl[-1, 0]) - 1, int(yv - hb) + 1
+    X, Y = np.meshgrid(np.arange(W) + 0.5, np.arange(max(0, ya), yb) + 0.5)
+    xe, xi = _x_on(E, Y), _x_on(I, Y)
+    u = (X - xe) / (xi - xe)
+    dy = (yv - hb) - Y
+    us = np.linspace(0.08, 0.92, 6)
+    A = np.zeros(X.shape)
+    for k in range(6):                                          # bilinear: dy along the table, u across
+        A += np.interp(dy, gl[:, 0], amp[:, k]) * np.clip(1 - np.abs(u - us[k]) / (us[1] - us[0]), 0, 1)
+    A *= (u >= 0) & (u <= 1) & (dy >= 0)
+    dt = f.get('dots')
+    if dt:                                                      # the dot grid: lines with brighter crossings
+        def near(c, o, per):
+            q = (c - o) / per
+            return np.exp(-(((q - np.round(q)) * per) / dt['sigma']) ** 2)
+        gx, gy = near(X, dt['origin'][0], dt['period'][0]), near(Y, dt['origin'][1], dt['period'][1])
+        A = np.clip(A * (dt['c'] + dt['a'] * (gx + gy) + dt['b'] * gx * gy), 0, 1)
+    arr = np.asarray(img).astype(np.float32)
+    sub = arr[max(0, ya):yb, :, :3]
+    sub[..., 0] = np.maximum(sub[..., 0], A * 255)
+    sub[..., 1] *= 1 - A
+    sub[..., 2] *= 1 - A
+    img = Image.fromarray(np.clip(arr + 0.5, 0, 255).astype(np.uint8), 'RGBA')
+    # the bar and the block (supersampled)
+    big = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big)
+    def band(ya_, yb_, grow=0.0):
+        yy = np.linspace(ya_, yb_, 10)
+        L = [(_x_on(E, y) - sd * grow, y) for y in yy]
+        R = [(_x_on(I, y) + sd * grow, y) for y in yy]
+        return [(x * SS, y * SS) for x, y in L + R[::-1]]
+    fw = b.get('frame_w', [3.0, 3.0])
+    def band2(ya_, yb_, gl_, gr_):
+        yy = np.linspace(ya_, yb_, 10)
+        L = [(_x_on(E, y) - sd * gl_, y) for y in yy]
+        R = [(_x_on(I, y) + sd * gr_, y) for y in yy]
+        return [(x * SS, y * SS) for x, y in L + R[::-1]]
+    if y0z - (yv + hb) > 1.5:
+        d.polygon(band2(yv + hb + 1.0, y0z, fw[0] / 2, fw[1] / 2), fill=(250, 250, 252, 255))     # the frame
+        d.polygon(band2(yv + hb + 2.3, y0z, -fw[0] / 2, -fw[1] / 2), fill=tuple(f['block']) + (255,))
+    pb = band(yv - hb, yv + hb, 0.3)
+    m = Image.new('L', big.size, 0)
+    ImageDraw.Draw(m).polygon(pb, fill=255)
+    big.paste(Image.new('RGBA', big.size, tuple(f['bar_color']) + (255,)), (0, 0), m)
+    img.alpha_composite(big.resize((W, H), Image.LANCZOS))
+    return img
+
+
+def photo_rpm(cfg):
+    """The value the photo shows (its bar's centre on the left blade's scale)."""
+    b = cfg['elements']['revs']['left']
+    H = cfg['grid'][1]
+    yc = sum(b['fill']['bar']) / 2
+    vy = [y * H for y in b['values_y']]
+    return float(np.interp(-yc, [-y for y in vy], np.arange(len(vy))))
+
+
 # ---------------------------------------------------------------- build
 
 def build_static(cfg):
     W, H = cfg['grid']
+    el = cfg['elements']
     big = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 255))
-    draw_fuel_static(big, cfg)
+    if 'fuel' in el:
+        draw_fuel_static(big, cfg)
     img = big.resize((W, H), Image.LANCZOS)
-    draw_fuel_labels(img, cfg)
+    for b in blades(cfg):
+        img = draw_blade_body(img, cfg, b)
+    if 'revs' in el:
+        top = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+        for b in blades(cfg):
+            draw_blade_floor(top, cfg, b)
+            draw_blade_lines(top, cfg, b)
+            draw_blade_digits(top, cfg, b)
+        img.alpha_composite(top.resize((W, H), Image.LANCZOS))
+    if 'fuel' in el:
+        draw_fuel_labels(img, cfg)
     return img
 
 
 def draw_dynamic(img, cfg, tel):
+    if 'rpm' in tel and 'revs' in cfg['elements']:
+        W, H = cfg['grid']
+        for b in blades(cfg):
+            img = draw_rev_level(img, cfg, b, tel['rpm'])
+        top = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))   # the lines and the numbers stay over the bar
+        for b in blades(cfg):
+            draw_blade_lines(top, cfg, b)
+        img.alpha_composite(top.resize((W, H), Image.LANCZOS))
     if 'fuel' in tel:
         img = draw_fuel_level(img, cfg, tel['fuel'])
         W, H = cfg['grid']                                      # the rail (lines, triangles, trails) stays over the fill
@@ -331,11 +574,12 @@ def draw_dynamic(img, cfg, tel):
 def compare(img, ref_path, out_path, box):
     ref = Image.open(ref_path).convert('RGB')
     a, b = ref.crop(box), img.convert('RGB').crop(box)
-    k = 6
+    k = max(1, min(6, 900 // (box[2] - box[0])))             # small boxes enlarged, wide ones at 1:1
     w, h = (box[2] - box[0]) * k, (box[3] - box[1]) * k
-    o = Image.new('RGB', (w * 3 + 20, h), (25, 25, 25))
+    tall = w > 1.5 * h                                          # wide boxes: photo / generated / 50% stacked
+    o = Image.new('RGB', (w, h * 3 + 20) if tall else (w * 3 + 20, h), (25, 25, 25))
     for j, im in enumerate((a, b, Image.blend(a, b, 0.5))):
-        o.paste(im.resize((w, h), Image.LANCZOS), (j * (w + 10), 0))
+        o.paste(im.resize((w, h), Image.LANCZOS), (0, j * (h + 10)) if tall else (j * (w + 10), 0))
     o.save(out_path)
     return out_path
 
@@ -363,7 +607,7 @@ def main():
         live.convert('RGB').save(os.path.join(out_dir, '%s_%s_live.png' % (cat, name)))
         print('live: design/out/%s_%s_live.png' % (cat, name))
     if a.compare:
-        live = draw_dynamic(static.copy(), cfg, tel or {'fuel': 1.0})
+        live = draw_dynamic(static.copy(), cfg, tel or dict({'fuel': 1.0}, **({'rpm': photo_rpm(cfg)} if 'revs' in cfg['elements'] else {})))
         ref = os.path.join(ROOT, 'design', 'refs', cat, cfg.get('reference', name) + '.png')
         print('compare: ' + os.path.relpath(compare(live, ref, os.path.join(out_dir, '%s_%s_compare.png' % (cat, name)),
                                                     tuple(cfg.get('compare_box', (115, 405, 315, 590)))), ROOT))
