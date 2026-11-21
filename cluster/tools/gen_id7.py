@@ -72,11 +72,16 @@ def interp(stops, v):
 def fuel_paths(cfg):
     el = cfg['elements']['fuel']
     W, H = cfg['grid']
-    A = densify(px(cfg, el['A']))
-    cap, body = A[:12], [p for p in A if p[1] >= px(cfg, el['A'])[2][1] - 0.5]
-    Boff = offset(densify(px(cfg, el['A'])[2:]), el['B_offset'])
-    Boff = [p for p in Boff if p[0] <= el['B_end_x'] * W]
-    B = densify(px(cfg, el['B_top']) + [Boff[0]], 1.0)[:-1] + Boff
+    a = px(cfg, el['A'])
+    A = [a[0]] + densify(a[1:])                                 # its top: a short stroke parallel to the spike's right edge
+    Boff = offset(densify(px(cfg, el['A'])[1:]), el['B_offset'])
+    Boff = [p for p in Boff if p[0] <= el['B_end_x'] * W and p[1] >= 428]
+    top = px(cfg, el['B_top']) + [Boff[0]]
+    B = []
+    for a, b in zip(top[:-1], top[1:]):                          # straight segments: the spike stays sharp
+        k = max(2, int(math.hypot(b[0] - a[0], b[1] - a[1])))
+        B += [(a[0] + (b[0] - a[0]) * i / k, a[1] + (b[1] - a[1]) * i / k) for i in range(k)]
+    B += Boff
     C = densify(px(cfg, el['C']))
     return A, B, C
 
@@ -130,12 +135,27 @@ def draw_fuel_static(img, cfg):
     img.paste(fill, (0, y0), m.crop((0, y0, img.size[0], y1)))
     lc = tuple(col['line'])
     _line(d, A, el['A_width'], lc)
-    _line(d, B, el['B_width'], lc)
-    for t in el['ticks']:                                       # from B towards C
-        p, _ = level_point(cfg, C, t['at'])
-        _, q = nearest(B, p)
-        v = np.array(p) - np.array(q); v /= np.linalg.norm(v)
-        _line(d, [q, tuple(np.array(q) + v * t['len'])], el['tick_width'], lc)
+    tail = el.get('B_tail', 0)
+    _line(d, B[:len(B) - tail] if tail else B, el['B_width'], lc)
+    if tail:                                                    # B's end: a thin point over the reserve
+        pts = np.array(B[len(B) - tail - 1:], float)
+        tg = np.gradient(pts, axis=0); tg /= np.linalg.norm(tg, axis=1, keepdims=True)
+        nn = np.stack([-tg[:, 1], tg[:, 0]], 1)
+        hw = el['B_width'] / 2 * np.linspace(1, 0.12, len(pts))[:, None]
+        poly = list(pts + nn * hw) + list((pts - nn * hw)[::-1])
+        d.polygon([(x * SS, y * SS) for x, y in poly], fill=lc)
+    tr = el.get('trail')
+    for t in el.get('triangles', []):                           # on B's inner side, apex towards C, with a trail
+        p, dv = level_point(cfg, C, t['at'])
+        i, q = nearest(B, p)
+        tg = np.array(B[min(i + 1, len(B) - 1)]) - np.array(B[max(i - 1, 0)]); tg /= np.linalg.norm(tg)
+        inw = np.array(p) - np.array(q); inw /= np.linalg.norm(inw)
+        q = np.array(q) + inw * el['B_width'] / 2 * 0.8
+        apex = q + inw * t['h']
+        if tr:
+            _line(d, [tuple(apex), tuple(p)], tr['width'], tuple(tr['color']))
+        tri = [q + tg * t['half'], apex, q - tg * t['half']]
+        d.polygon([(x * SS, y * SS) for x, y in tri], fill=lc)
     # C, its right end fading out
     fx0, fx1 = el['C_fade'][0] * W, el['C_fade'][1] * W
     m = Image.new('L', img.size, 0)
@@ -188,6 +208,19 @@ def draw_fuel_level(img, cfg, v):
     sub = arr[y0:y1, x0:x1, :3]
     arr[y0:y1, x0:x1, :3] = sub + (np.array(col['fill'], np.float32) - sub) * k[..., None]
     img = Image.fromarray(np.clip(arr + 0.5, 0, 255).astype(np.uint8), 'RGBA')
+    tr = el.get('trail')
+    if tr:                                                      # the trails go on faintly over the lit fill
+        lm = Image.new('L', (W * SS, H * SS), 0)
+        ld = ImageDraw.Draw(lm)
+        for t in el.get('triangles', []):
+            if t['at'] >= v:
+                continue
+            q, dq = level_point(cfg, C, t['at'])
+            _line(ld, [q, tuple(np.array(q) + dq * tr['fill_len'])], tr['width'], 255)
+        la = np.asarray(lm.resize((W, H), Image.BOX)).astype(np.float32) / 255
+        arr = np.asarray(img).astype(np.float32)
+        arr[..., :3] += (255 - arr[..., :3]) * (la * tr['fill_gain'])[..., None] * (arr[..., :3].mean(-1, keepdims=True) > 30)
+        img = Image.fromarray(np.clip(arr + 0.5, 0, 255).astype(np.uint8), 'RGBA')
     # the bar: along the level line from C, thick, its far end tapering and darker
     bl, bt = el['bar']['len'], el['bar']['thick']
     n = np.array([-dvec[1], dvec[0]])
