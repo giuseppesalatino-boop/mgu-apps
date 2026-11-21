@@ -384,11 +384,16 @@ def draw_blade_body(img, cfg, b):
 def _strip_var(d, pts, widths, fill):
     """A polyline with a width per point (supersampled draw)."""
     a = np.array(pts, float)
-    t = np.gradient(a, axis=0)
-    t /= np.linalg.norm(t, axis=1, keepdims=True) + 1e-9
-    n = np.stack([-t[:, 1], t[:, 0]], 1) * (np.array(widths)[:, None] / 2)
-    poly = list(a + n) + list((a - n)[::-1])
-    d.polygon([(x * SS, y * SS) for x, y in poly], fill=fill)
+    for (p, q), w0, w1 in zip(zip(a[:-1], a[1:]), widths[:-1], widths[1:]):   # one quad per segment + round
+        v = q - p                                               # joins: no self-crossing outline, no holes
+        L = np.linalg.norm(v)
+        if L < 1e-6:
+            continue
+        n = np.array([-v[1], v[0]]) / L
+        quad = [p + n * w0 / 2, q + n * w1 / 2, q - n * w1 / 2, p - n * w0 / 2]
+        d.polygon([(x * SS, y * SS) for x, y in quad], fill=fill)
+        r = w1 / 2
+        d.ellipse([(q[0] - r) * SS, (q[1] - r) * SS, (q[0] + r) * SS, (q[1] + r) * SS], fill=fill)
 
 
 def draw_blade_lines(big, cfg, b, col=(250, 250, 252)):
@@ -396,7 +401,17 @@ def draw_blade_lines(big, cfg, b, col=(250, 250, 252)):
     W, H = cfg['grid']
     d = ImageDraw.Draw(big)
     sd, O, E, I = blade_lines(cfg, b)
-    _strip_var(d, O, [interp(b['O_width'], p[1]) for p in O], col + (255,))
+    halo = b.get('tick_halo', 1.2)                              # the dark ring round each wedge (over the body)
+    for t in b['ticks']:
+        w = px(cfg, t['wedge'])
+        d.polygon([(x * SS, y * SS) for x, y in w], fill=(0, 0, 0, 255), outline=(0, 0, 0, 255),
+                  width=max(1, int(round(2 * halo * SS))))
+        r = abs(w[2][1] - w[1][1]) / 2 + halo
+        cx, cy = w[1][0] - sd * (r - halo), (w[1][1] + w[2][1]) / 2
+        d.ellipse([(cx - r) * SS, (cy - r) * SS, (cx + r) * SS, (cy + r) * SS], fill=(0, 0, 0, 255))
+    tg = np.gradient(np.array(O, float), axis=0)               # O_width is measured across a row: the width
+    tg /= np.linalg.norm(tg, axis=1, keepdims=True) + 1e-9      # across the line is that times |dy| of its tangent
+    _strip_var(d, O, [interp(b['O_width'], p[1]) * abs(t[1]) for p, t in zip(O, tg)], col + (255,))
     top = b['O_top']
     for p, q in zip(top[:-1], top[1:]):                        # the thin end: brightness as measured
         a = (p[2] + q[2]) / 2 / 255
