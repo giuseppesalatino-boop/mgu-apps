@@ -73,13 +73,13 @@ def fuel_paths(cfg):
     el = cfg['elements']['fuel']
     W, H = cfg['grid']
     A = densify(px(cfg, el['A']), step=0.75)
-    B_raw = offset(A, el['B_offset'])                           # B: A's parallel, from its top corner down to x 237
     B_corner_px = px(cfg, [el['B_corner']])[0]
-    B_body = [
-        p for p in B_raw
-        if p[0] <= el['B_end_x'] * W and p[1] >= B_corner_px[1] + 2.0
-    ]
-    B = [B_corner_px] + B_body                                  # its top: a corner turning into the '1' wedge
+    if 'B' in el:                                               # measured on its own (M8 reference)
+        B = [B_corner_px] + densify(px(cfg, el['B']), step=0.75)
+    else:                                                       # A's parallel
+        B_raw = offset(A, el['B_offset'])
+        B_body = [p for p in B_raw if p[0] <= el['B_end_x'] * W and p[1] >= B_corner_px[1] + 2.0]
+        B = [B_corner_px] + B_body
     C = densify(px(cfg, el['C']), step=0.75)
     return A, B, C
 
@@ -89,9 +89,10 @@ def level_point(cfg, C, v):
     el = cfg['elements']['fuel']
     y = interp(el['levels']['y'], v)
     W = cfg['grid'][0]
-    cands = [p for p in C if p[0] < 240]                       # the arc part (the bottom line is level 0)
+    lv = el['levels']
+    cands = [p for p in C if p[0] < lv.get('arc_max_x', 240)]  # the arc part (the bottom line is level 0)
     if v <= 0:
-        p = min(C, key=lambda q: abs(q[0] - 238))
+        p = min(C, key=lambda q: abs(q[0] - lv.get('x0', 238)))
     else:
         p = min(cands, key=lambda q: abs(q[1] - y))
     s = interp(el['levels']['slope'], v)
@@ -240,6 +241,9 @@ def draw_fuel_level(img, cfg, v):
     X, Y = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
     dist = g.poly_distance(C, X, Y)
     st = el['fill']['dist']
+    sy = el['fill'].get('dist_scale_y')
+    if sy:                                                      # the lit band widens towards the bottom
+        dist = dist / np.interp(Y, [s[0] for s in sy], [s[1] for s in sy])
     k = np.interp(dist, [s[0] for s in st], [s[1] for s in st])
     fx0, fx1 = el['fill']['fade_x'][0] * W, el['fill']['fade_x'][1] * W
     k = k * np.clip((fx1 - X) / (fx1 - fx0), 0, 1) * m * _below(cfg, p, dvec, X, Y)
@@ -279,9 +283,12 @@ def draw_fuel_level(img, cfg, v):
     # the bar: along the level line from the rail (B's inner edge), thick, its far end softening out (close-up photo)
     bl, bt = el['bar']['len'], el['bar']['thick']
     n = np.array([-dvec[1], dvec[0]])
-    q = np.array(nearest(offset(B, el['B_width'] / 2), p)[1])
-    start = np.array(p) + dvec * float(np.dot(q - np.array(p), dvec))
-    bl += float(np.linalg.norm(np.array(p) - start))
+    if el['bar'].get('from') == 'C':                            # from the lit edge (M8 reference)
+        start = np.array(p, dtype=float)
+    else:                                                       # from the rail
+        q = np.array(nearest(offset(B, el['B_width'] / 2), p)[1])
+        start = np.array(p) + dvec * float(np.dot(q - np.array(p), dvec))
+        bl += float(np.linalg.norm(np.array(p) - start))
     big = Image.new('RGBA', (img.size[0] * SS, img.size[1] * SS), (0, 0, 0, 0))
     bd = ImageDraw.Draw(big)
     steps = 60
@@ -357,9 +364,9 @@ def main():
         print('live: design/out/%s_%s_live.png' % (cat, name))
     if a.compare:
         live = draw_dynamic(static.copy(), cfg, tel or {'fuel': 1.0})
-        ref = os.path.join(ROOT, 'design', 'refs', cat, name + '.png')
+        ref = os.path.join(ROOT, 'design', 'refs', cat, cfg.get('reference', name) + '.png')
         print('compare: ' + os.path.relpath(compare(live, ref, os.path.join(out_dir, '%s_%s_compare.png' % (cat, name)),
-                                                    (115, 405, 315, 590)), ROOT))
+                                                    tuple(cfg.get('compare_box', (115, 405, 315, 590)))), ROOT))
 
 
 if __name__ == '__main__':
