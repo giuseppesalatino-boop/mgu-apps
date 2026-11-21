@@ -544,6 +544,73 @@ def photo_rpm(cfg):
     return float(np.interp(-yc, [-y for y in vy], np.arange(len(vy))))
 
 
+# ---------------------------------------------------------------- the centre (Corsa): gear, speed, line
+
+def _glyph_box(cfg, gl):
+    W, H = cfg['grid']
+    xs = [p[0] * W for p in gl['outline']]; ys = [p[1] * H for p in gl['outline']]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def draw_traced(img, cfg, gl, color):
+    """A traced glyph (outline minus its counters), supersampled into img."""
+    W, H = cfg['grid']
+    x0, y0, x1, y1 = _glyph_box(cfg, gl)
+    ox, oy = int(x0) - 2, int(y0) - 2
+    w_, h_ = int(x1 - ox) + 3, int(y1 - oy) + 3
+    m = Image.new('L', (w_ * SS, h_ * SS), 0)
+    d = ImageDraw.Draw(m)
+    P = lambda poly: [((x * W - ox) * SS, (y * H - oy) * SS) for x, y in poly]
+    d.polygon(P(gl['outline']), fill=255)
+    for h in gl['holes']:
+        d.polygon(P(h), fill=0)
+    m = m.resize((w_, h_), Image.LANCZOS)
+    lay = Image.new('RGBA', (w_, h_), tuple(color) + (0,))
+    lay.putalpha(m)
+    img.alpha_composite(lay, (ox, oy))
+
+
+def draw_center_value(img, cfg, part, text):
+    """Gear or speed: the traced glyph when it is the photographed one, else BMW's big glyphs with the measured
+    strokes, centred on the traced glyph's centre, same top."""
+    el = cfg['elements']['center'][part]
+    if text == el['text']:
+        draw_traced(img, cfg, el['glyph'], el['color'])
+        return
+    x0, y0, x1, y1 = _glyph_box(cfg, el['glyph'])
+    st = dict(el['style'])
+    widths = [st.get('letter_w', st['w']) if ch.isalpha() else (st['w'] * 0.62 if ch == '1' else st['w']) for ch in text]
+    total = sum(widths) + st['gap'] * (len(text) - 1)
+    g.draw_big(img, text, (x0 + x1) / 2 + total / 2, y0, st, el['color'])
+
+
+def draw_center_static(big, img_unused, cfg):
+    """The line and its end pieces (supersampled canvas)."""
+    W, H = cfg['grid']
+    d = ImageDraw.Draw(big)
+    for l_ in cfg['elements']['center']['line']:
+        d.polygon([(x * W * SS, y * H * SS) for x, y in l_['poly']], fill=tuple(l_['color']) + (255,))
+
+
+def draw_center_unit(img, cfg):
+    """km/h fitted into its traced box (the project's Barlow, the nearest to the cluster's own sans)."""
+    from PIL import ImageFont
+    W, H = cfg['grid']
+    u = cfg['elements']['center']['unit']
+    x0, y0, x1, y1 = u['box'][0] * W, u['box'][1] * H, u['box'][2] * W, u['box'][3] * H
+    f = ImageFont.truetype(os.path.join(HERE, 'fonts-src', u['font']), 400)
+    tmp = Image.new('L', (2400, 700), 0)
+    ImageDraw.Draw(tmp).text((50, 50), u['text'], font=f, fill=255)
+    part = tmp.crop(tmp.getbbox())
+    ww, hh = int(round((x1 - x0) * SS)), int(round((y1 - y0) * SS))
+    m = Image.new('L', (int(x1 - int(x0) + 2) * SS, int(y1 - int(y0) + 2) * SS), 0)
+    m.paste(part.resize((ww, hh), Image.LANCZOS), (int(round((x0 - int(x0)) * SS)), int(round((y0 - int(y0)) * SS))))
+    m = m.resize((m.width // SS, m.height // SS), Image.LANCZOS)
+    lay = Image.new('RGBA', m.size, tuple(u['color']) + (0,))
+    lay.putalpha(m)
+    img.alpha_composite(lay, (int(x0), int(y0)))
+
+
 # ---------------------------------------------------------------- build
 
 def build_static(cfg):
@@ -562,12 +629,22 @@ def build_static(cfg):
             draw_blade_lines(top, cfg, b)
             draw_blade_digits(top, cfg, b)
         img.alpha_composite(top.resize((W, H), Image.LANCZOS))
+    if 'center' in el:
+        top = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+        draw_center_static(top, img, cfg)
+        img.alpha_composite(top.resize((W, H), Image.LANCZOS))
+        draw_center_unit(img, cfg)
     if 'fuel' in el:
         draw_fuel_labels(img, cfg)
     return img
 
 
 def draw_dynamic(img, cfg, tel):
+    if 'center' in cfg['elements']:
+        if 'gear' in tel:
+            draw_center_value(img, cfg, 'gear', str(tel['gear']))
+        if 'speed' in tel:
+            draw_center_value(img, cfg, 'speed', str(int(round(float(tel['speed'])))))
     if 'rpm' in tel and 'revs' in cfg['elements']:
         W, H = cfg['grid']
         for b in blades(cfg):
@@ -584,6 +661,17 @@ def draw_dynamic(img, cfg, tel):
         img.alpha_composite(rail.resize((W, H), Image.LANCZOS))
         draw_fuel_labels(img, cfg)                              # the labels stay over the bar (as on the photo)
     return img
+
+
+def photo_tel(cfg):
+    """The values the reference shows: fuel full, the rev bar at idle, P and 0 km/h."""
+    el = cfg['elements']
+    tel = {'fuel': 1.0}
+    if 'revs' in el:
+        tel['rpm'] = photo_rpm(cfg)
+    if 'center' in el:
+        tel['gear'] = el['center']['gear']['text']; tel['speed'] = el['center']['speed']['text']
+    return tel
 
 
 def compare(img, ref_path, out_path, box):
@@ -617,12 +705,12 @@ def main():
     if a.sim:
         for kv in a.sim.split(','):
             k, v = kv.split('=')
-            tel[k] = float(v)
+            tel[k] = v if k == 'gear' else float(v)
         live = draw_dynamic(static.copy(), cfg, tel)
         live.convert('RGB').save(os.path.join(out_dir, '%s_%s_live.png' % (cat, name)))
         print('live: design/out/%s_%s_live.png' % (cat, name))
     if a.compare:
-        live = draw_dynamic(static.copy(), cfg, tel or dict({'fuel': 1.0}, **({'rpm': photo_rpm(cfg)} if 'revs' in cfg['elements'] else {})))
+        live = draw_dynamic(static.copy(), cfg, tel or photo_tel(cfg))
         ref = os.path.join(ROOT, 'design', 'refs', cat, cfg.get('reference', name) + '.png')
         print('compare: ' + os.path.relpath(compare(live, ref, os.path.join(out_dir, '%s_%s_compare.png' % (cat, name)),
                                                     tuple(cfg.get('compare_box', (115, 405, 315, 590)))), ROOT))

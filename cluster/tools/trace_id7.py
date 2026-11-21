@@ -544,6 +544,91 @@ def to_display(el, axis):
     return out
 
 
+def trace_shapes(img, box, thr=128, chan='min'):
+    """Shapes inside box (display px) traced sub-row by sub-row: each white run is linked to the run above it that
+    overlaps it; a shape's outline is its runs' left edges down and right edges up (shapes that are x-convex per
+    row; a glyph's counter comes back as its own dark shape via trace_holes). Returns polygons, display px."""
+    x0, y0, x1, y1 = box
+    A = img.min(2) if chan == 'min' else img.mean(2)
+    shapes, open_ = [], []
+    for s_ in range(int(y0 * K), int(y1 * K)):
+        row = A[s_, int(x0 * K):int(x1 * K)] > thr
+        e = np.flatnonzero(np.diff(np.r_[0, row.astype(int), 0]))
+        runs = [(x0 + e[i] / K, x0 + e[i + 1] / K) for i in range(0, len(e), 2)]
+        nxt = []
+        for r in runs:
+            hit = next((sh for sh in open_ if sh['R'][-1][0] > r[0] and sh['L'][-1][0] < r[1] and sh['last'] == s_ - 1
+                        and not sh.get('taken')), None)
+            if hit is None:
+                hit = {'L': [], 'R': []}
+                shapes.append(hit)
+            hit['L'].append((r[0], s_ / K)); hit['R'].append((r[1], s_ / K)); hit['last'] = s_; hit['taken'] = True
+            nxt.append(hit)
+        for sh in nxt:
+            sh['taken'] = False
+        open_ = nxt
+    out = []
+    for sh in shapes:
+        if len(sh['L']) < 2:
+            continue
+        L = sh['L'] + [(sh['L'][-1][0], sh['L'][-1][1] + 1 / K)]
+        R = sh['R'] + [(sh['R'][-1][0], sh['R'][-1][1] + 1 / K)]
+        L = simplify(L, 0.12); R = simplify(R, 0.12)
+        out.append([[round(x, 2), round(y, 2)] for x, y in L + R[::-1]])
+    return out
+
+
+def trace_glyph(img, box, thr=128):
+    """A glyph with counters: its outline (the white extent per sub-row) and its holes (dark runs between white runs)."""
+    x0, y0, x1, y1 = box
+    A = img.min(2)
+    L, R, holes, cur = [], [], [], None
+    for s_ in range(int(y0 * K), int(y1 * K)):
+        row = A[s_, int(x0 * K):int(x1 * K)] > thr
+        idx = np.flatnonzero(row)
+        if not len(idx):
+            continue
+        y = s_ / K
+        L.append((x0 + idx[0] / K, y)); R.append((x0 + (idx[-1] + 1) / K, y))
+        gaps = np.flatnonzero(np.diff(idx) > 1)
+        if len(gaps):
+            g0 = x0 + (idx[gaps[0]] + 1) / K; g1 = x0 + idx[gaps[0] + 1] / K
+            if cur is None:
+                cur = {'L': [], 'R': []}; holes.append(cur)
+            cur['L'].append((g0, y)); cur['R'].append((g1, y))
+        else:
+            cur = None
+    def poly(Lp, Rp):
+        Lp = Lp + [(Lp[-1][0], Lp[-1][1] + 1 / K)]; Rp = Rp + [(Rp[-1][0], Rp[-1][1] + 1 / K)]
+        return [[round(x, 2), round(y, 2)] for x, y in simplify(Lp, 0.12) + simplify(Rp, 0.12)[::-1]]
+    return {'outline': poly(L, R), 'holes': [poly(h['L'], h['R']) for h in holes if len(h['L']) > 2]}
+
+
+def measure_center(img):
+    """Component 2: the gear (P), the speed (0) with km/h, the horizontal line with its end pieces."""
+    Lm = img.mean(2)
+    P = trace_glyph(img, (900, 290, 1040, 390))
+    Z = trace_glyph(img, (920, 415, 1020, 485))
+    line = trace_shapes(img, (760, 390, 1175, 402), thr=90, chan='mean')
+    line = [p for p in line if (max(q[0] for q in p) - min(q[0] for q in p)) > 2
+            and (max(q[1] for q in p) - min(q[1] for q in p)) > 1.5]          # no fringe pieces
+    # colours: the median of each part's lit pixels
+    def col(poly):
+        xs = [q[0] for q in poly]; ys = [q[1] for q in poly]
+        sub = img[int(min(ys) * K):int(max(ys) * K), int(min(xs) * K):int(max(xs) * K)].reshape(-1, 3)
+        sub = sub[sub.mean(1) > 90]
+        return np.median(sub, 0).round().astype(int).tolist()
+    km = img[int(425 * K):int(447 * K), int(1072 * K):int(1124 * K)]
+    m = km.min(2) > 60
+    r_, c_ = np.where(m.any(1))[0], np.where(m.any(0))[0]
+    kmbox = [round(1072 + c_[0] / K, 2), round(425 + r_[0] / K, 2), round(1072 + (c_[-1] + 1) / K, 2), round(425 + (r_[-1] + 1) / K, 2)]
+    kmcol = np.percentile(km.reshape(-1, 3)[m.reshape(-1)], 90, axis=0).round().astype(int).tolist()
+    return {'gear': {'text': 'P', 'glyph': P, 'color': col(P['outline'])},
+            'speed': {'text': '0', 'glyph': Z, 'color': col(Z['outline'])},
+            'unit': {'text': 'km/h', 'box': kmbox, 'color': kmcol},
+            'line': [{'poly': p, 'color': col(p)} for p in sorted(line, key=lambda p: p[0][0])]}
+
+
 def main():
     what = sys.argv[1] if len(sys.argv) > 1 else 'blade'
     if what == 'revs':                                        # trace_id7.py revs id7/Corsa: into its config.json
@@ -556,6 +641,23 @@ def main():
             el[side] = dict(revs[side], **keep)
         json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
         print('revs -> ' + os.path.relpath(path, ROOT))
+    if what == 'center':                                      # trace_id7.py center id7/Corsa
+        c = measure_center(load(None))
+        def nm(poly):
+            return [[round(x / W, 5), round(y / H, 5)] for x, y in poly]
+        for k in ('gear', 'speed'):
+            g_ = c[k]['glyph']
+            c[k]['glyph'] = {'outline': nm(g_['outline']), 'holes': [nm(h) for h in g_['holes']]}
+        c['unit']['box'] = [round(c['unit']['box'][0] / W, 5), round(c['unit']['box'][1] / H, 5),
+                            round(c['unit']['box'][2] / W, 5), round(c['unit']['box'][3] / H, 5)]
+        for l_ in c['line']:
+            l_['poly'] = nm(l_['poly'])
+        path = os.path.join(ROOT, 'layouts', sys.argv[2], 'config.json')
+        cfg = json.load(open(path, encoding='utf-8'))
+        old = cfg['elements'].get('center', {})
+        cfg['elements']['center'] = dict(c, **{k: v for k, v in old.items() if k.startswith('_') or k not in c})
+        json.dump(cfg, open(path, 'w', encoding='utf-8'), indent=1)
+        print('center -> ' + os.path.relpath(path, ROOT))
     if what == 'blade':
         axis = float(sys.argv[2]) if len(sys.argv) > 2 else None
         img = load(axis)
