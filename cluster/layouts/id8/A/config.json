@@ -1168,6 +1168,11 @@
         "lift_mph": 3
       }
     },
+    "map_window": {
+      "_about": "The centre slot as a map (cfg 'center' = 'map'): a see-through window in our layer where the BMW map (KOMBI slot 0x100, under us) shows. Hypothesis until measured on the car: the whole central panel, up to the speed and gear inserts (its notches) without entering them, inset 8 px for an even blue rim.",
+      "of": "panel",
+      "inset": 8
+    },
     "tray": {
       "_about": "The stylised blue trapezoid under the bottom bar, at the centre: 4 slanted segments split by thin black cuts (the first '\\', the others '/'), the whole sheared left as on the photo. Edges fitted on the photo's rows y 664-703 (subpixel, blue channel), top 648.5 / bottom 705.5. Vertical gradient sampled at x 820-1080.",
       "segments": [

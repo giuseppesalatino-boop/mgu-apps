@@ -623,6 +623,59 @@ def draw_tray(img, cfg):
     img.paste(fill, (x0, y0), m)
 
 
+def map_window(cfg):
+    """The centre slot's map window (config 'map_window'), an 'L' mask at grid size (255 = see-through): the shape of
+    'of' (the central panel, whose notches are the speed and gear inserts, so it never enters them) shrunk by 'inset'
+    px, which leaves an even blue rim all round, its edge anti-aliased over 1 px."""
+    el = cfg['elements'].get('map_window')
+    W, H = cfg['grid']
+    poly = panel_shapes(cfg)[el['of']]
+    xs, ys = [p[0] for p in poly], [p[1] for p in poly]
+    x0, y0, x1, y1 = int(min(xs)) - 2, int(min(ys)) - 2, int(math.ceil(max(xs))) + 2, int(math.ceil(max(ys))) + 2
+    inside = Image.new('L', ((x1 - x0) * SS, (y1 - y0) * SS), 0)
+    ImageDraw.Draw(inside).polygon([((x - x0) * SS, (y - y0) * SS) for x, y in poly], fill=255)
+    inside = np.asarray(inside.resize((x1 - x0, y1 - y0), Image.BOX)) > 127
+    X, Y = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
+    dist = poly_distance(poly + [poly[0]], X, Y)
+    a = np.where(inside, np.clip(dist - el['inset'] + 0.5, 0, 1), 0)
+    m = np.zeros((H, W), np.uint8)
+    m[y0:y1, x0:x1] = (a * 255 + 0.5).astype(np.uint8)
+    return Image.fromarray(m, 'L')
+
+
+def punch_map(img, cfg):
+    """The static layer with the map window made transparent (the BMW map, under our layer, shows through it)."""
+    m = np.asarray(map_window(cfg)).astype(np.float32) / 255
+    arr = np.asarray(img).astype(np.float32)
+    arr *= (1 - m)[..., None]                                   # premultiplied: colour and alpha go together
+    return Image.fromarray((arr + 0.5).astype(np.uint8), 'RGBA')
+
+
+def placeholder_map(W, H, seed=3):
+    """A stand-in for the BMW navigation map in previews only (night colours, a street grid, the route, the car
+    arrow); the car shows its own map through the window."""
+    img = Image.new('RGBA', (W * 2, H * 2), (30, 34, 40, 255))
+    d = ImageDraw.Draw(img)
+    rng = np.random.default_rng(seed)
+    a = math.radians(-12)                                       # a street grid, a little turned
+    u, v = (math.cos(a), math.sin(a)), (-math.sin(a), math.cos(a))
+    P = lambda s, t: (1920 + s * u[0] + t * v[0], 720 + s * u[1] + t * v[1])
+    for k in range(-30, 31):                                    # the streets each way, some of them main roads
+        for along, cross in ((u, v), (v, u)):
+            off = k * 110 + rng.uniform(-25, 25)
+            main = rng.random() < 0.12
+            col, wd = ((92, 98, 108, 255), 14) if main else ((58, 64, 74, 255), 6)
+            if along is u:
+                d.line([P(-3000, off), P(3000, off)], fill=col, width=wd)
+            else:
+                d.line([P(off, -3000), P(off, 3000)], fill=col, width=wd)
+    d.line([(1920, 1300), (1920, 940), (2040, 700), (2400, 560), (2900, 460)], fill=(70, 160, 255, 255), width=22,
+           joint='curve')                                       # the route
+    cx, cy = 1920, 1010                                         # the car arrow
+    d.polygon([(cx, cy - 46), (cx + 30, cy + 34), (cx, cy + 18), (cx - 30, cy + 34)], fill=(240, 244, 250, 255))
+    return img.resize((W, H), Image.LANCZOS)
+
+
 def feet_glow(img, cfg):
     """The blurred blue / red glow under the brackets' feet (config 'feet_glow'), added over the black."""
     W, H = cfg['grid']
@@ -721,6 +774,8 @@ def build_static(cfg):
     for el in cfg['elements'].values():
         img = gauge_bevel(img, cfg, el)
     img = feet_glow(img, cfg)
+    if cfg.get('center') == 'map' and 'map_window' in cfg['elements']:
+        img = punch_map(img, cfg)
     draw_numbers(img, cfg)
     draw_labels(img, cfg)
     draw_gauge_labels(img, cfg)
@@ -1079,13 +1134,18 @@ def main():
         sim = {}
         for kv in a.sim.split(','):
             k, v = kv.split('=')
-            sim[k] = v if k in ('gear', 'engine') else float(v)
+            sim[k] = v if k in ('gear', 'engine', 'center') else float(v)
+        cfg['center'] = sim.get('center', cfg.get('center', 'panel'))
         cfg['engine'] = sim.get('engine', cfg.get('engine', 'petrol'))
         if 'scale' in sim:                                     # the speed scale (260, 330, 160mph, 200mph)
             cfg['elements']['bracket_left']['numbers']['scale'] = '%g' % sim['scale'] if isinstance(sim['scale'], float) else sim['scale']
         for k in ('speed', 'gear'):                            # the live values replace the photo's samples
             cfg['elements'][k]['sample'] = ''
-        live = fit_view(draw_dynamic(build_static(cfg), cfg, sim), cfg)
+        live = draw_dynamic(build_static(cfg), cfg, sim)
+        if cfg.get('center') == 'map':                          # the map under the window (a stand-in)
+            W, H = cfg['grid']
+            live = Image.alpha_composite(placeholder_map(W, H), live)
+        live = fit_view(live, cfg)
         out = os.path.join(ROOT, 'design', 'out', '%s_%s_live.png' % (cat, name))
         os.makedirs(os.path.dirname(out), exist_ok=True)
         live.convert('RGB').save(out)
