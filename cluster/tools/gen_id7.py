@@ -343,6 +343,62 @@ def draw_fuel_level(img, cfg, v, key='fuel'):
     return img
 
 
+# ---------------------------------------------------------------- the user's point editor (lines and fillets, shapes)
+
+def fillet_path(pts, radii, step=0.25):
+    """The polyline through pts with a circular fillet of radius r at each interior vertex (clamped to fit), sampled."""
+    P = np.array(pts, float); n = len(P); out = [P[0]]
+    for i in range(1, n - 1):
+        u = P[i] - P[i - 1]; w = P[i + 1] - P[i]; lu = np.linalg.norm(u); lw = np.linalg.norm(w); u /= lu; w /= lw
+        th = np.arccos(np.clip(u @ w, -1, 1)); r = float(radii[i - 1] or 0)
+        if r <= 0 or th < 1e-4:
+            out.append(P[i]); continue
+        tl = r * np.tan(th / 2); tmax = min(lu if i == 1 else lu / 2, lw if i == n - 2 else lw / 2)
+        if tl > tmax:
+            tl = tmax; r = tl / np.tan(th / 2)
+        T1, T2 = P[i] - u * tl, P[i] + w * tl
+        cr = np.sign(u[0] * w[1] - u[1] * w[0]); C = T1 + np.array([-u[1], u[0]]) * r * cr
+        a0 = np.arctan2(*(T1 - C)[::-1]); a1 = np.arctan2(*(T2 - C)[::-1]); da = (a1 - a0 + np.pi) % (2 * np.pi) - np.pi
+        m = max(2, int(abs(da) * r / step))
+        out += [C + r * np.array([np.cos(a), np.sin(a)]) for a in a0 + da * np.linspace(0, 1, m)]
+    out.append(P[-1])
+    return [tuple(q) for q in out]
+
+
+def _hex(c):
+    return tuple(int(c[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def editor_items(cfg, key, which):
+    ed = cfg['elements'][key].get('editor')
+    if not ed:
+        return []
+    return [e for e in ed['items'] if (e['name'] == 'C') == (which == 'live')]
+
+
+def draw_editor(img, cfg, key, which='static', clip=None):
+    """The editor's items (static: all but C; live: C), supersampled; clip = (p, d): only under that level line."""
+    W, H = cfg['grid']
+    big = Image.new('RGBA', (W * SS, H * SS), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big)
+    for e in editor_items(cfg, key, which):
+        col = _hex(e.get('color') or '#ffffff') + (255,)
+        if e['kind'] == 'forma':
+            d.polygon([(x * SS, y * SS) for x, y in e['pts']], fill=col)
+            continue
+        pts = fillet_path(e['pts'], e['radii'])
+        if e['kind'] == 'tacca':
+            d.line([(x * SS, y * SS) for x, y in pts], fill=col, width=max(1, int(round(e['width'] * SS))))
+        else:
+            _line(d, pts, e['width'], col)
+    lay = np.asarray(big.resize((W, H), Image.LANCZOS)).astype(np.float32)
+    if clip is not None:
+        XX, YY = np.meshgrid(np.arange(W) + 0.5, np.arange(H) + 0.5)
+        lay[..., 3] *= _below(cfg, clip[0], clip[1], XX, YY)
+    img.alpha_composite(Image.fromarray(np.clip(lay + 0.5, 0, 255).astype(np.uint8), 'RGBA'))
+    return img
+
+
 # ---------------------------------------------------------------- a fuel-type gauge rebuilt at 10x (trace_id7 fuel10)
 
 def rebuilt(cfg, key):
@@ -417,6 +473,9 @@ def draw_temp_static(img, cfg):
     """The fuel gauge's drawing in the mirrored frame (temp's lines stored there), mirrored onto the right."""
     W, H = cfg['grid']
     el = cfg['elements']['temp']
+    if 'editor' in el:                                          # the user's drawing, on the display as it is
+        draw_editor(img, cfg, 'temp')
+        return
     if rebuilt(cfg, 'temp'):                                    # 10x rebuild: drawn on a clear layer, mirrored
         lay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
         g10_static(lay, cfg, 'temp')
@@ -502,7 +561,14 @@ def draw_temp_level(img, cfg, t_c):
     if rebuilt(cfg, 'temp'):
         m = g10_level(m, cfg, 'temp', v)
         img = mirror(m, el['mirror_axis'], back=True)
-        draw_temp_overlay(img, cfg)
+        if 'editor' in el:
+            p, dv = g10_level_point(cfg, 'temp', v)            # the level line, back on the display
+            ax = el['mirror_axis']
+            pd, dd = np.array([2 * ax - p[0], p[1]]), np.array([dv[0], -dv[1]])
+            draw_editor(img, cfg, 'temp', 'live', clip=(pd, dd))
+            draw_editor(img, cfg, 'temp')
+        else:
+            draw_temp_overlay(img, cfg)
         draw_temp_labels(img, cfg)
         return img
     m = draw_fuel_level(m, cfg, v, key='temp')
@@ -829,7 +895,9 @@ def build_static(cfg):
     if 'fuel' in el and not rebuilt(cfg, 'fuel'):
         draw_fuel_static(big, cfg)
     img = big.resize((W, H), Image.LANCZOS)
-    if rebuilt(cfg, 'fuel'):
+    if 'editor' in el.get('fuel', {}):
+        draw_editor(img, cfg, 'fuel')
+    elif rebuilt(cfg, 'fuel'):
         g10_static(img, cfg, 'fuel')
     for b in blades(cfg):
         img = draw_blade_body(img, cfg, b)
@@ -869,7 +937,14 @@ def draw_dynamic(img, cfg, tel):
         for b in blades(cfg):
             draw_blade_lines(top, cfg, b)
         img.alpha_composite(top.resize((W, H), Image.LANCZOS))
-    if 'fuel' in tel and rebuilt(cfg, 'fuel'):
+    if 'fuel' in tel and 'editor' in cfg['elements']['fuel']:
+        v = float(np.clip(tel['fuel'], 0, 1))
+        img = g10_level(img, cfg, 'fuel', v)                   # the fill (as photographed) and the bar at the level
+        p, dv = g10_level_point(cfg, 'fuel', v)
+        draw_editor(img, cfg, 'fuel', 'live', clip=(p, dv))    # C under the level
+        draw_editor(img, cfg, 'fuel')                          # the drawing over it
+        draw_fuel_labels(img, cfg)
+    elif 'fuel' in tel and rebuilt(cfg, 'fuel'):
         img = g10_level(img, cfg, 'fuel', tel['fuel'])
         draw_fuel_labels(img, cfg)
     elif 'fuel' in tel:
